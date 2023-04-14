@@ -56,6 +56,12 @@ cnt_n, cnt_m = 8, 0  # n,m nanotube vectors
 cnt_l = 2    # Repetition units of a single CNT
 cnt_gap = 4  # Distance betwen CNTs (Ang)
 
+# Random things
+random_seed = True
+if not random_seed:
+    seed = 42
+    random.seed(seed)
+
 # ---------------------------
 # Calculation parameters
 # ---------------------------
@@ -86,16 +92,6 @@ kpts = (1, 1, 1)
 # Build the System
 # -----------------
 
-# CNT
-cnt = nanotube(cnt_n, cnt_m, length=cnt_l)
-
-# c = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
-
-# I can not set the constraints at this time, because when I attach the
-# molecules, the constraints are lost. I need to calculate the distance
-# to the CoM to find the CNT carbon atoms (radial distance)
-# cnt.set_constraint(c)
-
 
 def get_xy_distance(a, b):
     """
@@ -105,79 +101,87 @@ def get_xy_distance(a, b):
     return np.linalg.norm(a[0:2] - b[0:2])
 
 
-# Get the limits of the CNT
-cnt_xyz = cnt.get_positions()
-min_x, max_x = min(cnt_xyz[:, 0]), max(cnt_xyz[:, 0])
-min_y, max_y = min(cnt_xyz[:, 1]), max(cnt_xyz[:, 1])
-min_z, max_z = min(cnt_xyz[:, 2]), max(cnt_xyz[:, 2])
-cell_z = cnt.get_cell()[2][2]
+def create_nanotube():
+    # CNT
+    cnt = nanotube(cnt_n, cnt_m, length=cnt_l)
+
+    # mask = [atom.symbol == 'C' for atom in cnt]
+    # constraints = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
+    constraints = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
+    cnt.set_constraint(constraints)
+
+    return cnt
 
 
-# Will arrange the molecules along the Z axis of the CNT
-molecular_distance_z = (cell_z)/(n_molecules) * compresion_factor
-print(molecular_distance_z)
-# Orient the first molecule
-molecules = molecule(molec)
-molecules.rotate(90, 'x')
-displace = [0, 0, molecular_distance_z * random.random()]
-molecules.translate(displace)
-molecules.rotate(random.randint(0, 360), 'z')
-if add_tilt:
-    molecules.rotate(random.randint(0, tilt_factor)*random.choice([-1, 1]),
-                     random.choice(['x', 'y']))
+def add_molecules(cnt):
+    """ Add ONLY the molecules along the Z axis of the nanotube
+    Does not add the nanotube itself
 
-#
-# next molecules
-mmol = molecule(molec)
-mmol.rotate(90, 'x')
-for m in range(1, n_molecules):
-    # mmol.rotate((360/n_molecules * m), 'z')
-    mmol.rotate(random.randint(0, 360), 'z')
+    Parameters
+    ----------
+      - cnt: nanotube
+
+    Returns
+    -------
+      - Randomly rotated and tilted row of molecules along the Z
+        axis of the cnt
+    """
+
+    # Will arrange the molecules along the Z axis of the CNT
+    molecular_distance_z = (
+        cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
+    print(molecular_distance_z)
+    # Orient the first molecule
+    molecules = molecule(molec)
+    molecules.rotate(90, 'x')
+    displace = [0, 0, molecular_distance_z * random.random()]
+    molecules.translate(displace)
+    molecules.rotate(random.randint(0, 360), 'z')
     if add_tilt:
-        mmol.rotate(random.randint(0, tilt_factor)*random.choice([-1, 1]),
-                    random.choice(['x', 'y']))
+        molecules.rotate(random.randint(0, tilt_factor)*random.choice([-1, 1]),
+                         random.choice(['x', 'y']))
 
-    molecules = attach(molecules, mmol,
-                       distance=molecular_distance_z,
-                       direction=(0, 0, 1))
+    # Add remaining molecules
+    mmol = molecule(molec)
+    mmol.rotate(90, 'x')
+    for m in range(1, n_molecules):
+        # mmol.rotate((360/n_molecules * m), 'z')
+        mmol.rotate(random.randint(0, 360), 'z')
+        if add_tilt:
+            mmol.rotate(random.randint(0, tilt_factor)*random.choice([-1, 1]),
+                        random.choice(['x', 'y']))
 
-# OR
-#
-# cell_x = [(max_x - min_x), 0, 0 ]
-# cell_y = [0, (max_y - min_y), 0 ]
-# cell_z = cnt.get_cell()[2]  # Use the lattice parameter Z of the CNT
-# cnt.set_cell([cell_x,cell_y, cell_z])
-# for m in range(0,n_molecules):
-# Another option to add the molecules insde the CNT
-#     cnt = attach_randomly(cnt, molecule(molec), 1.4)
-# system = cnt
-
-# IDEA: To add many  more molecules inside a CNT:
-# - Create a cell with this limits
-#     (tuned accordingly as a function of molecular distances)
-# - Add molecules within the cell
-# - Wrap it so all molecules are inside the cell
-# - Attach the CNT
+        molecules = attach(molecules, mmol,
+                           distance=molecular_distance_z,
+                           direction=(0, 0, 1))
+    return molecules
 
 
-# mask = [atom.symbol == 'C' for atom in cnt]
-# constraints = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
-constraints = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
-cnt.set_constraint(constraints)
+def set_cell(system, cnt):
+    """Set the cell parameter of the system according to the CNT dimensions"""
+    # TODO: If attach_randomly was used check all molecules are inside the CNT
+    # (maybe we do not need all molecules inside?)
+
+    # Get the limits of the CNT
+    cnt_xyz = cnt.get_positions()
+    min_x, max_x = min(cnt_xyz[:, 0]), max(cnt_xyz[:, 0])
+    min_y, max_y = min(cnt_xyz[:, 1]), max(cnt_xyz[:, 1])
+    # min_z, max_z = min(cnt_xyz[:, 2]), max(cnt_xyz[:, 2])
+    cell_z = cnt.get_cell()[2][2]
+
+    cell_x = [(max_x - min_x + cnt_gap), 0, 0]
+    cell_y = [0, (max_y - min_y + cnt_gap), 0]
+    cell_z = cnt.get_cell()[2]  # Use the lattice parameter Z of the CNT
+    system.set_cell([cell_x, cell_y, cell_z])
+
+
+cnt = create_nanotube()
+molecules = add_molecules(cnt)
 
 # Add the CNT to the molecular system
-
-# system = attach(molecules,cnt, distance=1.9 )  # Does not preserve CNT constraints
+# system = attach(molecules,cnt, distance=1.9 )  # Does not preserve constraints
 system = cnt + molecules      # It does preserve constraints
-
-# Set cell
-# TODO: If attach_randomly was used check all molecules are inside the CNT
-# (maybe we do not need all molecules inside?)
-
-cell_x = [(max_x - min_x + cnt_gap), 0, 0]
-cell_y = [0, (max_y - min_y + cnt_gap), 0]
-cell_z = cnt.get_cell()[2]  # Use the lattice parameter Z of the CNT
-system.set_cell([cell_x, cell_y, cell_z])
+set_cell(system, cnt)
 
 
 # ------------------------
@@ -222,12 +226,11 @@ system.set_cell([cell_x, cell_y, cell_z])
 # This is the initial system, not the optimized
 view(system, repeat=[2, 2, 2])
 
-
 # ------------------------
 # Run the calculation
 # ------------------------
 
-# TODO: Run it with QE, GPAW, FHI-AIMS...
+# TODO: Run it with GPAW, FHI-AIMS...?
 #
 # EMT is just for testing pourposes, in fact the CO2 molecules break
 # system.calc = EMT()
@@ -240,3 +243,7 @@ system.set_calculator(calc_QE)
 # system.get_total_energy()
 # print('Calculating forces...')
 # system.get_forces()
+
+# TODO: Add results to the database
+# Generate M different geometries
+# Compare similarity between generated molecules
