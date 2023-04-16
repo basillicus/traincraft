@@ -1,5 +1,9 @@
+import sys
 import numpy as np
 import random
+from params import Config
+from tomlkit import load
+
 from ase.build import nanotube
 from ase.build import molecule
 from ase.visualize import view
@@ -37,60 +41,22 @@ OUTPUT:
         QE output files
 
 """
-# ---------------------------
-# System Geometry parameters
-# ---------------------------
 
-# TODO: Read the configuration from a config file?
-# including the input_params (instead of hardcoding it in the script)
+configfile = 'cnt_generator.toml'
+if len(sys.argv) > 1:
+    configfile = sys.argv[1]
 
-# Molecules
-molec = 'CO2'
-n_molecules = 4
-compresion_factor = 1  # How close the molecules will be inside the CNT
-add_tilt = True
-tilt_factor = 15    # max randomly molecular tilt around either x or y
+config = Config(configfile)
+config.read_parameters()
 
-# CNT
-cnt_n, cnt_m = 8, 0  # n,m nanotube vectors
-cnt_l = 2    # Repetition units of a single CNT
-cnt_gap = 4  # Distance betwen CNTs (Ang)
 
-# Random things
-random_seed = True
-if not random_seed:
-    seed = 42
-    random.seed(seed)
+def set_seed():
+    """Duh!"""
+    if not config.random_seed:
+        random.seed(config.seed)
 
-# ---------------------------
-# Calculation parameters
-# ---------------------------
 
-input_params = {
-    "ecutwfc": 45,     # plane-wave wave-function cutoff
-    "ecutrho": 180,    # density wave-function cutoff,
-    "conv_thr": 1e-6,  # DFT self-consistency convergence
-    "pseudo_dir": "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/",
-    "vdw_corr": "xdm",
-    "occupations": 'smearing',   # Add smearing
-    "smearing": 'cold',  # smearing kind
-    "degauss": 0.02,     # smearing amount
-    "tprnfor": True,     # Print forces
-    "tstress": True      # Print stress tensor
-}
-# Add a new paramter to the input_params dict
-input_params["calculation"] = 'scf'
-
-# define the pseudopotentials
-pseudos = {"C": "C.pbe-n-kjpaw_psl.1.0.0.UPF",
-           "O": "O.pbe-n-kjpaw_psl.0.1.UPF"}
-
-kpts = (1, 1, 1)
-# kpts = (2, 2, 2)
-
-# -----------------
-# Build the System
-# -----------------
+set_seed()
 
 
 def get_xy_distance(a, b):
@@ -103,6 +69,7 @@ def get_xy_distance(a, b):
 
 def create_nanotube():
     # CNT
+    cnt_n, cnt_m, cnt_l = config.cnt_n, config.cnt_m, config.cnt_l
     cnt = nanotube(cnt_n, cnt_m, length=cnt_l)
 
     # mask = [atom.symbol == 'C' for atom in cnt]
@@ -127,10 +94,18 @@ def add_molecules(cnt):
         axis of the cnt
     """
 
+    molec = config.molec
+    n_molecules = config.n_molecules
+    compresion_factor = config.compresion_factor
+    add_tilt = config.add_tilt
+    tilt_factor = config.tilt_factor
+
+    if not config.random_seed:
+        random.seed(config.seed)
+
     # Will arrange the molecules along the Z axis of the CNT
     molecular_distance_z = (
         cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
-    print(molecular_distance_z)
     # Orient the first molecule
     molecules = molecule(molec)
     molecules.rotate(90, 'x')
@@ -161,6 +136,8 @@ def set_cell(system, cnt):
     """Set the cell parameter of the system according to the CNT dimensions"""
     # TODO: If attach_randomly was used check all molecules are inside the CNT
     # (maybe we do not need all molecules inside?)
+
+    cnt_gap = config.cnt_gap
 
     # Get the limits of the CNT
     cnt_xyz = cnt.get_positions()
@@ -234,13 +211,19 @@ view(system, repeat=[2, 2, 2])
 #
 # EMT is just for testing pourposes, in fact the CO2 molecules break
 # system.calc = EMT()
+
+input_params = config.input_params
+pseudos = config.pseudos
+kpts = tuple(config.kpts)
+print(kpts)
+
 calc_QE = Espresso(input_data=input_params,
                    pseudopotentials=pseudos,
                    kpts=kpts)
 system.set_calculator(calc_QE)
 
-# print('Calculating energy...')
-# system.get_total_energy()
+print('Calculating energy...')
+system.get_total_energy()
 # print('Calculating forces...')
 # system.get_forces()
 
