@@ -1,4 +1,5 @@
 from tomlkit import load
+from pathlib import Path
 
 
 class Config:
@@ -29,6 +30,8 @@ class Config:
         being config and object of the Class Config:
             config = Config(configfile)
         """
+        # self.n_structures = self.config['structures'].get('n_structures', 3)
+
         # ---------------------------
         # System Geometry parameters
         # ---------------------------
@@ -45,13 +48,14 @@ class Config:
         self.cnt_l = self.config['cnt'].get('cnt_l', 2)
         self.cnt_gap = self.config['cnt'].get('cnt_gap', 4.0)
 
-        # config
-        self.random_seed = self.config['config'].get('random_seed', True)
-        self.seed = self.config['config'].get('seed', 42)
-
         # ---------------------------
         # Calculation parameters
         # ---------------------------
+        self.calculator = self.config['calculator'].get('calculator', 'qe')
+        self.calculate_e = self.config['calculator'].get(
+            'calculate_energies', False)
+        self.calculate_f = self.config['calculator'].get(
+            'calculate_forces', False)
 
         default_input_params_qe = {
             "ecutwfc": 45,     # plane-wave wave-function cutoff
@@ -68,7 +72,10 @@ class Config:
 
         # define the pseudopotentials
         default_pseudos = {"C": "C.pbe-n-kjpaw_psl.1.0.0.UPF",
-                           "O": "O.pbe-n-kjpaw_psl.0.1.UPF"}
+                           "O": "O.pbe-n-kjpaw_psl.0.1.UPF",
+                           "N": "N.oncvpsp.upf",
+                           "H": "H_ONCV_PBE-1.0.oncvpsp.upf",
+                           }
 
         self.input_params = self.config['calculator'].get(
             'qe', default_input_params_qe)
@@ -78,3 +85,15 @@ class Config:
         # self.input_params.pop('kpts')
         self.pseudos = self.config['calculator']['qe'].get(
             'pseudos', default_pseudos)
+
+        # ---------------------------
+        # General configuration parameters
+        # ---------------------------
+        # config
+        self.random_seed = self.config['config'].get('random_seed', True)
+        self.seed = self.config['config'].get('seed', 42)
+        self.prefix = self.config['config'].get('folder_prefix', 'cnt')
+
+        # Paths
+        self.cwd = Path.cwd()
+        self.outdir = self.config['config'].get('outdir', self.cwd)

@@ -1,9 +1,15 @@
+# ----------------------------
+# Building geometry parameters
+# ----------------------------
+[structures]
+n_structures = 10  # Total number of random geoemtries to be generated
+
 [molecules]
 molecule = 'CO'
 n_molecules = 4
 compresion_factor = 1  # How close molecules will be inside the CNT
-add_tilt = true
-tilt_factor = 15    # max randomly molecular tilt around either x or y
+add_tilt = true     # Wheter to add a random tilt to the molecules
+tilt_factor = 15    # +-max randomly molecular tilt around either x or y
 
 [cnt]
 # n,m nanotube vectors
@@ -12,20 +18,19 @@ cnt_m = 0
 cnt_l = 2    # Repetition units of a single CNT
 cnt_gap = 4  # Distance betwen CNTs (Ang)
 
-[config]
-# Random things
-random_seed = false
-seed = 43  # If not random_seed, use this instead
-
 # ---------------------------
 # Calculation parameters
 # ---------------------------
 [calculator]
 
+calculator = 'qe'  # Use Quantum Espresso to calculate enrgies/forces
+calculate_energies = true
+calculate_forces = true
+  # Set the calculator parameters
   [calculator.qe]
     calculation = 'scf'
-    ecutwfc = 30     # plane-wave wave-function cutoff
-    #ecutwfc = 45     # plane-wave wave-function cutoff
+    #ecutwfc = 30     # plane-wave wave-function cutoff
+    ecutwfc = 45     # plane-wave wave-function cutoff
     ecutrho = 180    # density wave-function cutoff,
     conv_thr = 1e-6  # DFT self-consistency convergence
     pseudo_dir = "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/"
@@ -40,3 +45,14 @@ seed = 43  # If not random_seed, use this instead
     [calculator.qe.pseudos]
       C = 'C.pbe-n-kjpaw_psl.1.0.0.UPF'
       O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
+
+# ---------------------------
+# General configuration stuff
+# ---------------------------
+
+[config]
+# Random things
+ 
+random_seed = false
+seed = 42  # If random_seed is false, use this seed instead
+folder_prefix = 'cnt'
