@@ -2,14 +2,30 @@
 # Building geometry parameters
 # ----------------------------
 [structures]
-n_structures = 10  # Total number of random geoemtries to be generated
+n_structures = 5  # Total number of random geoemtries to be generated
 
 [molecules]
-molecule = 'CO'
+molecule = 'CO2'
 n_molecules = 4
-compresion_factor = 1  # How close molecules will be inside the CNT
-add_tilt = true     # Wheter to add a random tilt to the molecules
-tilt_factor = 15    # +-max randomly molecular tilt around either x or y
+compresion_factor = 1.0  # How close molecules will be inside the CNT
+
+# TODO: Add posibility for totally random rotation?
+#
+# Axis order in which rotations will be performed, the same axis can be given several times, so several rotations will be performd
+# Non mandatory. Default is ['x', 'y', 'z']
+# rot_axis = ['y', 'x', 'z', 'y']
+rot_axis = ['x', 'y', 'z']
+
+# Rotations for each molecule (in degrees) 
+# (Non mandatory)
+rot_x = 90
+rot_y = {'min' = 80, 'max' = 100}
+rot_z = {'min' = 0, 'max' = 360}
+
+
+# If not given, none is tilted
+# tilt_factor = 15    # +-max randomly molecular tilt around either x or y
+# NOTE: I believe this is not needed if rot_axis and rot_? are chosen carefully
 
 [cnt]
 # n,m nanotube vectors
@@ -24,7 +40,7 @@ cnt_gap = 4  # Distance betwen CNTs (Ang)
 [calculator]
 
 calculator = 'qe'  # Use Quantum Espresso to calculate enrgies/forces
-calculate_energies = true
+calculate_energies = false
 calculate_forces = true
   # Set the calculator parameters
   [calculator.qe]
@@ -47,12 +63,26 @@ calculate_forces = true
       O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
 
 # ---------------------------
+# Visualization parameters
+# ---------------------------
+[visualize]
+# You wanna see the geometries?
+visualize = true
+# repeat = [1,1,3]
+
+# ---------------------------
 # General configuration stuff
 # ---------------------------
 
 [config]
+
 # Random things
- 
-random_seed = false
+random_seed = true
 seed = 42  # If random_seed is false, use this seed instead
+
+# Paths and files
 folder_prefix = 'cnt'
+logfile = 'test.log'
+# outdir = './'
+
+nproc = 4

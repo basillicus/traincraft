@@ -30,23 +30,36 @@ class Config:
         being config and object of the Class Config:
             config = Config(configfile)
         """
-        # self.n_structures = self.config['structures'].get('n_structures', 3)
+        self.n_structures = self.config['structures'].get('n_structures', 3)
 
         # ---------------------------
         # System Geometry parameters
         # ---------------------------
         self.molec = self.config['molecules'].get('molecule', 'CO2')
         self.n_molecules = self.config['molecules'].get('n_molecules', 2)
-        self.add_tilt = self.config['molecules'].get('add_tilt', True)
-        self.tilt_factor = self.config['molecules'].get('tilt_factor', 15)
         self.compresion_factor = self.config['molecules'].get(
             'compresion_factor', 1.0)
+
+        # Molecules manipulation
+        self.tilt_factor = self.config['molecules'].get('tilt_factor', None)
+        self.molec_rot_x = self.config['molecules'].get('rot_x', None)
+        self.molec_rot_y = self.config['molecules'].get('rot_y', None)
+        self.molec_rot_z = self.config['molecules'].get('rot_z', None)
+
+        self.molec_rot_axis = self.config['molecules'].get(
+            'rot_axis', ['x', 'y', 'z'])
 
         # CNT
         self.cnt_n = self.config['cnt'].get('cnt_n', 8)
         self.cnt_m = self.config['cnt'].get('cnt_m', 0)
         self.cnt_l = self.config['cnt'].get('cnt_l', 2)
         self.cnt_gap = self.config['cnt'].get('cnt_gap', 4.0)
+
+        # ---------------------------
+        # Visualization parameters
+        # ---------------------------
+        self.visualize = self.config['visualize'].get('visualize', True)
+        self.vis_repeat = self.config['visualize'].get('repeat', [2, 2, 2])
 
         # ---------------------------
         # Calculation parameters
@@ -92,8 +105,17 @@ class Config:
         # config
         self.random_seed = self.config['config'].get('random_seed', True)
         self.seed = self.config['config'].get('seed', 42)
-        self.prefix = self.config['config'].get('folder_prefix', 'cnt')
 
         # Paths
+        self.prefix = self.config['config'].get('folder_prefix', 'cnt')
         self.cwd = Path.cwd()
-        self.outdir = self.config['config'].get('outdir', self.cwd)
+
+        outdir_str = self.config['config'].get('outdir')
+        if outdir_str is not None:
+            self.outdir = Path(outdir_str)
+        else:
+            self.outdir = self.cwd
+        self.logfile = self.config['config'].get('logfile', 'logfile.log')
+
+        # Parallelization
+        self.nproc = self.config['config'].get('nproc', 1)

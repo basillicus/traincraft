@@ -1,9 +1,9 @@
 import os
-from pathlib import Path
 from ase.calculators.espresso import Espresso
-from ase.visualize import view
 import toolkit as tk
 from config import config
+
+# from ase.parallel import MPI
 
 # from gpaw import GPAW
 # from ase.calculators.emt import EMT
@@ -39,24 +39,32 @@ OUTPUT:
 
 """
 
+# comm = MPI.COMM_WORLD
+# rank = comm.rank
+
 # Order the chaos
 tk.set_seed()
 
-# -----------------------
-# Create the geometries
-# -----------------------
-cnt = tk.create_nanotube()
-molecules = tk.add_molecules(cnt)
+
+structures = config.n_structures
+for structure in range(structures):
+
+    # -----------------------
+    # Create the geometries
+    # -----------------------
+    cnt = tk.create_nanotube()
+    molecules = tk.add_molecules(cnt)
 
 # Add CNT to molecular system
-system = cnt + molecules
-tk.set_cell(system, cnt)
+    system = cnt + molecules
+    # system = molecules
+    tk.set_cell(system, cnt)
 
 # -----------------------
 # Visualize the system
 # -----------------------
 # This is the initial system, not the optimized
-view(system, repeat=[2, 2, 2])
+    tk.visualize(system)
 
 # -----------------------
 # Run the calculation
@@ -65,17 +73,20 @@ view(system, repeat=[2, 2, 2])
 # EMT is just for testing pourposes, EMT breaks CO2 molecules
 # system.calc = EMT()
 
-input_params, pseudos, kpts = tk.get_calculator_parameters()
-calc_QE = Espresso(input_data=input_params,
-                   pseudopotentials=pseudos,
-                   kpts=kpts)
-system.set_calculator(calc_QE)
+    input_params, pseudos, kpts, command = tk.get_calculator_parameters()
+    calc_QE = Espresso(input_data=input_params,
+                       pseudopotentials=pseudos,
+                       kpts=kpts,
+                       command=command)
+    system.set_calculator(calc_QE)
 
+    # if rank == 0:
+    os.chdir(tk.set_calculation_folder())
 
-os.chdir(tk.set_calculation_folder())
-if (config.calculate_e):
-    print('Calculating energy...')
-    system.get_total_energy()
-if (config.calculate_f):
-    print('Calculating forces...')
-    # system.get_forces()
+    if (config.calculate_e):
+        print('Calculating energy...')
+        system.get_total_energy()
+    if (config.calculate_f):
+        print('Calculating forces...')
+        system.get_forces()
+    os.chdir(config.cwd)

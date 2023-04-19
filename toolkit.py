@@ -1,12 +1,17 @@
 import numpy as np
+import sys
 from pathlib import Path
 import random
 from config import config
+import logging
 
 from ase.build import nanotube
 from ase.build import molecule
 from ase.constraints import FixAtoms
 from ase.build.attach import attach
+from ase.visualize import view
+
+from ase.parallel import parallel_function
 # from ase.build.attach import attach_randomly
 # from ase.build import make_supercell, find_optimal_cell_shape
 # from ase.io import write
@@ -16,9 +21,13 @@ from ase.build.attach import attach
 
 def set_seed():
     """Duh!"""
-    if not config.random_seed:
-        random.seed(config.seed)
-        np.random.seed(config.seed)
+    if config.random_seed:
+        seed = random.randrange(2**32 - 2)
+    else:
+        seed = config.seed
+    random.seed(seed)
+    np.random.seed(seed)
+    logging.info(f'seed : {seed}')
 
 
 def get_xy_distance(a, b):
@@ -91,22 +100,48 @@ def add_molecules(cnt):
     molec = config.molec
     n_molecules = config.n_molecules
     compresion_factor = config.compresion_factor
-    add_tilt = config.add_tilt
     tilt_factor = config.tilt_factor
+    rot_x = config.molec_rot_x
+    rot_y = config.molec_rot_y
+    rot_z = config.molec_rot_z
 
-    if not config.random_seed:
-        random.seed(config.seed)
+    rot_axis = config.molec_rot_axis
+
+    def get_rotation_angle(angle):
+        if isinstance(angle, dict):
+            return random.uniform(angle['min'], angle['max'])
+        if angle is None:
+            return 0
+        else:
+            return angle
+
+    def rotate_molecule(molecule, axis=['x', 'y', 'z']):
+        for ax in axis:
+            if ax == 'x' and rot_x:
+                molecule.rotate(get_rotation_angle(rot_x), 'x')
+            if ax == 'y':
+                molecule.rotate(get_rotation_angle(rot_y), 'y')
+            if ax == 'z':
+                molecule.rotate(get_rotation_angle(rot_z), 'z')
 
     # Will arrange the molecules along the Z axis of the CNT
     molecular_distance_z = (
         cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
-    # Orient the first molecule
+
     molecules = molecule(molec)
-    molecules.rotate(90, 'x')
-    displace = [0, 0, molecular_distance_z * random.random()]
-    molecules.translate(displace)
-    molecules.rotate(random.randint(0, 360), 'z')
-    if add_tilt:
+
+    # Orient the first molecule
+    rotate = rot_x or rot_y or rot_z
+    if rotate:
+        # Rotate
+        rotate_molecule(molecules, rot_axis)
+
+    if True:
+        displace = [0, 0, molecular_distance_z * random.random()]
+        molecules.translate(displace)
+        # molecules.rotate(random.randint(0, 360), 'z')
+
+    if tilt_factor:
         molecules.rotate(random.randint(0, tilt_factor)*random.choice([-1, 1]),
                          random.choice(['x', 'y']))
 
@@ -152,13 +187,17 @@ def set_cell(system, cnt):
 
 
 def get_calculator_parameters():
-    """ Set the calculator parameters"""
+    """ Get the calculator parameters from config object"""
 
     input_params = config.input_params
     pseudos = config.pseudos
     kpts = tuple(config.kpts)
+    if not config.nproc or not isinstance(config.nproc, int) or config.nproc < 1:
+        print("Error: invalid value for nproc in config file.")
+        sys.exit(1)
+    command = f"mpiexec -np {config.nproc} pw.x < espresso.pwi > espresso.pwo"
 
-    return input_params, pseudos, kpts
+    return input_params, pseudos, kpts, command
 
 # -----------------------
 # Write some files
@@ -169,21 +208,21 @@ def get_calculator_parameters():
 
 # write('system.in', system, format='espresso-in',
 #       pseudopotentials={'C': '', 'O': ''})
-# traj_file = 'geopt.traj'
+# traj_file = 'geopt.t eraj'
 
 
 # -------------------------
 # Path tools
 # -------------------------
+# @ parallel_function
+# def set_calculation_folder(parallel=False):
 def set_calculation_folder():
     import uuid
     items = (str(config.prefix),
-             str(config.cnt_n),
-             str(config.cnt_m),
+             str(config.cnt_n) + '-' + str(config.cnt_m),
              str(config.cnt_l),
              str(config.n_molecules) + str(config.molec),
              )
-    print(items)
     d = '_'.join(items)
     p = config.outdir / d
     p.mkdir(exist_ok=True)
@@ -194,4 +233,13 @@ def set_calculation_folder():
     except FileExistsError:
         set_calculation_folder()
 
+    logging.info(f'folder created: {calcdir}')
+
     return calcdir
+
+
+def visualize(system):
+    if config.visualize:
+        view(system, repeat=config.vis_repeat)
+        print(config.vis_repeat)
+        print(type(config.vis_repeat))
