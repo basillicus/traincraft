@@ -94,13 +94,12 @@ def add_molecules(cnt):
 
     Returns
     -------
-      - Randomly rotated and tilted row of molecules along the Z
-        axis of the cnt
+      -  Molecules along the Z axis of the cnt, rotated and displaced according
+         to the input parameters
     """
     molec = config.molec
     n_molecules = config.n_molecules
     compresion_factor = config.compresion_factor
-    tilt_factor = config.tilt_factor
     rot_x = config.molec_rot_x
     rot_y = config.molec_rot_y
     rot_z = config.molec_rot_z
@@ -108,10 +107,10 @@ def add_molecules(cnt):
     rot_axis = config.molec_rot_axis
 
     def get_rotation_angle(angle):
-        if isinstance(angle, dict):
-            return random.uniform(angle['min'], angle['max'])
         if angle is None:
             return 0
+        if isinstance(angle, dict):
+            return random.uniform(angle['min'], angle['max'])
         else:
             return angle
 
@@ -133,28 +132,19 @@ def add_molecules(cnt):
     # Orient the first molecule
     rotate = rot_x or rot_y or rot_z
     if rotate:
-        # Rotate
+        # Rotatmoleculese
         rotate_molecule(molecules, rot_axis)
 
+    # TODO: Add parameters to contrlo displacement
     if True:
         displace = [0, 0, molecular_distance_z * random.random()]
         molecules.translate(displace)
-        # molecules.rotate(random.randint(0, 360), 'z')
-
-    if tilt_factor:
-        molecules.rotate(random.randint(0, tilt_factor)*random.choice([-1, 1]),
-                         random.choice(['x', 'y']))
 
     # Add remaining molecules
-    mmol = molecule(molec)
-    mmol.rotate(90, 'x')
     for m in range(1, n_molecules):
-        # mmol.rotate((360/n_molecules * m), 'z')
-        mmol.rotate(random.randint(0, 360), 'z')
-        if add_tilt:
-            mmol.rotate(random.randint(0, tilt_factor)*random.choice([-1, 1]),
-                        random.choice(['x', 'y']))
-
+        mmol = molecule(molec)
+        if rotate:
+            rotate_molecule(mmol, rot_axis)
         molecules = attach(molecules, mmol,
                            distance=molecular_distance_z,
                            direction=(0, 0, 1))

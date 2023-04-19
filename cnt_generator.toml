@@ -22,11 +22,6 @@ rot_x = 90
 rot_y = {'min' = 80, 'max' = 100}
 rot_z = {'min' = 0, 'max' = 360}
 
-
-# If not given, none is tilted
-# tilt_factor = 15    # +-max randomly molecular tilt around either x or y
-# NOTE: I believe this is not needed if rot_axis and rot_? are chosen carefully
-
 [cnt]
 # n,m nanotube vectors
 cnt_n = 8
@@ -38,10 +33,10 @@ cnt_gap = 4  # Distance betwen CNTs (Ang)
 # Calculation parameters
 # ---------------------------
 [calculator]
-
 calculator = 'qe'  # Use Quantum Espresso to calculate enrgies/forces
 calculate_energies = false
 calculate_forces = true
+
   # Set the calculator parameters
   [calculator.qe]
     calculation = 'scf'
@@ -73,9 +68,7 @@ visualize = true
 # ---------------------------
 # General configuration stuff
 # ---------------------------
-
 [config]
-
 # Random things
 random_seed = true
 seed = 42  # If random_seed is false, use this seed instead
@@ -85,4 +78,5 @@ folder_prefix = 'cnt'
 logfile = 'test.log'
 # outdir = './'
 
-nproc = 4
+# Parallelization
+nproc = 4   # Number of cores to run qe as: mpiexec -np nproc ...
