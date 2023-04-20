@@ -2,11 +2,11 @@
 # Building geometry parameters
 # ----------------------------
 [structures]
-n_structures = 5  # Total number of random geoemtries to be generated
+n_structures = 10  # Total number of random geoemtries to be generated
 
 [molecules]
 molecule = 'CO2'
-n_molecules = 4
+n_molecules = 6
 compresion_factor = 1.0  # How close molecules will be inside the CNT
 
 # TODO: Add posibility for totally random rotation?
@@ -14,12 +14,12 @@ compresion_factor = 1.0  # How close molecules will be inside the CNT
 # Axis order in which rotations will be performed, the same axis can be given several times, so several rotations will be performd
 # Non mandatory. Default is ['x', 'y', 'z']
 # rot_axis = ['y', 'x', 'z', 'y']
-rot_axis = ['x', 'y', 'z']
+rot_axis = ['x', 'z', 'y']
 
 # Rotations for each molecule (in degrees) 
 # (Non mandatory)
 rot_x = 90
-rot_y = {'min' = 80, 'max' = 100}
+rot_y = {'min' = -25, 'max' = 25}
 rot_z = {'min' = 0, 'max' = 360}
 
 [cnt]
@@ -39,11 +39,15 @@ calculate_forces = true
 
   # Set the calculator parameters
   [calculator.qe]
-    calculation = 'scf'
-    #ecutwfc = 30     # plane-wave wave-function cutoff
-    ecutwfc = 45     # plane-wave wave-function cutoff
-    ecutrho = 180    # density wave-function cutoff,
-    conv_thr = 1e-6  # DFT self-consistency convergence
+    # calculation = 'scf'
+    calculation = 'relax'
+    # ecutwfc = 30         # plane-wave wave-function cutoff
+    ecutwfc = 45          # plane-wave wave-function cutoff
+    ecutrho = 180         # density wave-function cutoff,
+    conv_thr = 1e-8       # DFT self-consistency convergence
+    forc_conv_thr = 1e-3  # Force convergence threshold
+    etot_conv_thr = 1e-5  # Total energy convergence threshold
+    nstep = 100           # Total ionic steps
     pseudo_dir = "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/"
     vdw_corr = "xdm"
     occupations = "smearing"   # Add smearing
@@ -71,11 +75,11 @@ visualize = true
 [config]
 # Random things
 random_seed = true
-seed = 42  # If random_seed is false, use this seed instead
+# seed = 42  # If random_seed is false, use this seed instead
 
 # Paths and files
 folder_prefix = 'cnt'
-logfile = 'test.log'
+logfile = 'logfile.log'
 # outdir = './'
 
 # Parallelization

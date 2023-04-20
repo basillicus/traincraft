@@ -2,6 +2,7 @@ import os
 from ase.calculators.espresso import Espresso
 import toolkit as tk
 from config import config
+import logging
 
 # from ase.parallel import MPI
 
@@ -84,9 +85,11 @@ for structure in range(structures):
     os.chdir(tk.set_calculation_folder())
 
     if (config.calculate_e):
-        print('Calculating energy...')
+        logging.info('  Calculating energy...')
         system.get_total_energy()
+        logging.info('  Energy calculation finished')
     if (config.calculate_f):
-        print('Calculating forces...')
+        logging.info('  Calculating forces...')
         system.get_forces()
+        logging.info('  Forces calculation finished')
     os.chdir(config.cwd)

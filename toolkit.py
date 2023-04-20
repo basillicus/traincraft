@@ -231,5 +231,3 @@ def set_calculation_folder():
 def visualize(system):
     if config.visualize:
         view(system, repeat=config.vis_repeat)
-        print(config.vis_repeat)
-        print(type(config.vis_repeat))
