@@ -94,7 +94,7 @@ class Config:
             'qe', default_input_params_qe)
         # print(self.input_params)
         self.input_params.pop('pseudos')
-        self.kpts = self.config['calculator']['qe'].get('kpts')
+        self.kpts = self.config['calculator']['qe'].get('kpts', None)
         # self.input_params.pop('kpts')
         self.pseudos = self.config['calculator']['qe'].get(
             'pseudos', default_pseudos)

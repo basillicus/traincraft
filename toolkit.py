@@ -181,7 +181,11 @@ def get_calculator_parameters():
 
     input_params = config.input_params
     pseudos = config.pseudos
-    kpts = tuple(config.kpts)
+    if config.kpts is not None:
+        kpts = tuple(config.kpts)
+    else:
+        kpts = None
+
     if not config.nproc or not isinstance(config.nproc, int) or config.nproc < 1:
         print("Error: invalid value for nproc in config file.")
         sys.exit(1)
