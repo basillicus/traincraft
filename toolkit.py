@@ -193,7 +193,7 @@ def get_calculator_parameters():
         kpts = None
     nproc = config.nproc
 
-    if nproc is not None and not isinstance(nproc, int) or nproc < 1:
+    if nproc is not None and (not isinstance(nproc, int) or nproc < 1):
         print("Error: invalid value for nproc in config file.")
         sys.exit(1)
 
