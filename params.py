@@ -54,6 +54,7 @@ class Config:
         self.cnt_m = self.config['cnt'].get('cnt_m', 0)
         self.cnt_l = self.config['cnt'].get('cnt_l', 2)
         self.cnt_gap = self.config['cnt'].get('cnt_gap', 4.0)
+        self.cnt_constraints = self.config['cnt'].get('constraints', 'all')
 
         # ---------------------------
         # Visualization parameters
@@ -117,5 +118,8 @@ class Config:
             self.outdir = self.cwd
         self.logfile = self.config['config'].get('logfile', 'logfile.log')
 
+        # PERF: nproc is still experimental and still needs to be tested in
+        # different systems with different environments
+
         # Parallelization
-        self.nproc = self.config['config'].get('nproc', 1)
+        self.nproc = self.config['config'].get('nproc', None)

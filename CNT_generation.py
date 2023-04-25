@@ -1,5 +1,5 @@
 import os
-from ase.calculators.espresso import Espresso
+
 import toolkit as tk
 from config import config
 import logging
@@ -10,9 +10,10 @@ import logging
 # from ase.calculators.emt import EMT
 
 # TODO:
-# - Generate M different geometries
+# x Generate M different geometries
 # - Add results to the database
 # - Compare similarity between generated structures
+# - Analyse results
 # - Add more calculators
 
 """
@@ -21,19 +22,23 @@ and/or forces.
 
 PARAMETERS (read from a config.toml file)
 ----------
-    molec: (str), ['CO2']|'H2O'|'N2'|....
-    n_molecules: (int), [4] number of molecules to fill the CNT with
-    compresion_factor: (float) controls how close/far the molecules will be
-    add_tilt: (bool), whether to add random tilt in either x or y axis
-    tilt_factor: (int), [15] max tilt in degrees (can also be )
+    - molec: (str), ['CO2']|'H2O'|'N2'|....
+    - n_molecules: (int), [4] number of molecules to fill the CNT with
+    - compresion_factor: (float) controls how close/far the molecules will be
+    - rot_?: rotation along the ? axis (x, y or z). Can be either a fixed value
+      or a dict with min and max values. If not given, will be None
+        rot_x = 78.3   or rot_y = {'min' = -12 , 'max' = 32.3}
+    - rot_axis: List with the order of axes rotations will be performed on:
+        rot_axis = ['x', 'y', 'z'] (default)
+        rot_axis = ['y', 'z', 'x', 'y']
 
-    cnt_n, cnt_m: (int, int), [8], [0] n and m nanotube vectors
-    cnt_l: (int), [2] Repetition units of a single CNT along its Z axis
-    cnt_gap: (float), [4] Distance betwen neighbour CNTs (Ang)
+    - cnt_n, cnt_m: (int, int), [8], [0] n and m nanotube vectors
+    - cnt_l: (int), [2] Repetition units of a single CNT along its Z axis
+    - cnt_gap: (float), [4] Distance betwen neighbour CNTs (Ang)
 
 OUTPUT:
 -------
-    Visualizes the system
+    Visualizes the system if requested in config file
     After running the calculation:
         QE input file
         QE output files
@@ -46,7 +51,6 @@ OUTPUT:
 # Order the chaos
 tk.set_seed()
 
-
 structures = config.n_structures
 for structure in range(structures):
 
@@ -56,30 +60,26 @@ for structure in range(structures):
     cnt = tk.create_nanotube()
     molecules = tk.add_molecules(cnt)
 
-# Add CNT to molecular system
+    # Add molecules and CNT together
     system = cnt + molecules
-    # system = molecules
     tk.set_cell(system, cnt)
 
-# -----------------------
-# Visualize the system
-# -----------------------
-# This is the initial system, not the optimized
+    # -----------------------
+    # Visualize the system
+    # -----------------------
+    # This is the initial system, not the optimized
     tk.visualize(system)
 
-# -----------------------
-# Run the calculation
-# -----------------------
+    # -----------------------
+    # Run the calculation
+    # -----------------------
 
-# EMT is just for testing pourposes, EMT breaks CO2 molecules
-# system.calc = EMT()
+    # EMT is just for testing pourposes, EMT breaks CO2 molecules
+    # system.calc = EMT()
 
-    input_params, pseudos, kpts, command = tk.get_calculator_parameters()
-    calc_QE = Espresso(input_data=input_params,
-                       pseudopotentials=pseudos,
-                       kpts=kpts,
-                       command=command)
-    system.set_calculator(calc_QE)
+    calc = tk.set_calculator_parameters()
+    # system.set_calculator(calc_QE)  # Deprecated
+    system.calc = calc
 
     # if rank == 0:
     os.chdir(tk.set_calculation_folder())

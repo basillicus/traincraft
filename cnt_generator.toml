@@ -28,6 +28,7 @@ cnt_n = 8
 cnt_m = 0
 cnt_l = 2    # Repetition units of a single CNT
 cnt_gap = 4  # Distance betwen CNTs (Ang)
+constraints = 'all'
 
 # ---------------------------
 # Calculation parameters
@@ -83,4 +84,4 @@ logfile = 'logfile.log'
 # outdir = './'
 
 # Parallelization
-nproc = 4   # Number of cores to run qe as: mpiexec -np nproc ...
+# nproc = 4   # Number of cores to run qe as: mpiexec -np nproc ...

@@ -1,17 +1,20 @@
-import numpy as np
 import sys
-from pathlib import Path
-import random
-from config import config
 import logging
+# from pathlib import Path
 
+import random
+import numpy as np
+
+from config import config
+
+from ase.calculators.espresso import Espresso
 from ase.build import nanotube
 from ase.build import molecule
 from ase.constraints import FixAtoms
 from ase.build.attach import attach
 from ase.visualize import view
 
-from ase.parallel import parallel_function
+# from ase.parallel import parallel_function
 # from ase.build.attach import attach_randomly
 # from ase.build import make_supercell, find_optimal_cell_shape
 # from ase.io import write
@@ -27,7 +30,7 @@ def set_seed():
         seed = config.seed
     random.seed(seed)
     np.random.seed(seed)
-    logging.info(f'seed : {seed}')
+    logging.info(f'seed: {seed}')
 
 
 def get_xy_distance(a, b):
@@ -39,36 +42,36 @@ def get_xy_distance(a, b):
 
 
 def create_nanotube():
-    """Creates a nanotube
+    """Clue: Creates a ...
 
     Parameters
     ----------
-    n,m and l are taken from the config file
+    n,m and lenght are taken from the config file
 
     Returns
     -------
-    a carbon nanotube (ase Atom object)
+    a carbon nanotube (ase Atom object). Do not eat!
     """
 
-    # CNT
-    cnt_n, cnt_m, cnt_l = config.cnt_n, config.cnt_m, config.cnt_l
-    cnt = nanotube(cnt_n, cnt_m, length=cnt_l)
+    n, m, lenght = config.cnt_n, config.cnt_m, config.cnt_l
+    constraints = config.cnt_constraints
+    cnt = nanotube(n, m, length=lenght)
 
     # mask = [atom.symbol == 'C' for atom in cnt]
-    constraints = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
-    cnt.set_constraint(constraints)
+    if constraints == 'all':
+        constraints = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
+        cnt.set_constraint(constraints)
 
     # ------------------------
     # WORK OUT THE CONSTRAINTS
     # ------------------------
+    # NOTE: Sorry for the mess below... A more flexible way of adding
+    # constraints will be useful, but it may take some time before is
+    # implemented. I keep this here for the future...
 
     # Apply constraints based on a radial distance to the z axis of the CNT
     # If the distance between the longitudinal axis Z and the x,y coordintes is
-    # bigger than 95% of the radius of the the CNT, them fix the atom
-
-    # NOTE: No need to work out the constraints at the moment, because if
-    # I add the CNT with the operator '+' it preserve the constraints.
-    # I will keep this here in case I will need it in the future
+    # bigger than 95% of the radius of the the CNT, then fix the atom
 
     # system_cto = cnt.get_center_of_mass()       # center of Mass of the CNT
     # cnt_atom =  cnt.get_positions()[1]          # take a random atom of the CNT
@@ -97,6 +100,7 @@ def add_molecules(cnt):
       -  Molecules along the Z axis of the cnt, rotated and displaced according
          to the input parameters
     """
+    # Get the parameters from config object
     molec = config.molec
     n_molecules = config.n_molecules
     compresion_factor = config.compresion_factor
@@ -123,19 +127,20 @@ def add_molecules(cnt):
             if ax == 'z':
                 molecule.rotate(get_rotation_angle(rot_z), 'z')
 
-    # Will arrange the molecules along the Z axis of the CNT
+    # It will arrange the molecules along the Z axis of the CNT
     molecular_distance_z = (
         cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
 
     molecules = molecule(molec)
 
-    # Orient the first molecule
     rotate = rot_x or rot_y or rot_z
+
+    # Orient the first molecule
     if rotate:
-        # Rotatmoleculese
+        # Rotate molecules
         rotate_molecule(molecules, rot_axis)
 
-    # TODO: Add parameters to contrlo displacement
+    # TODO: Add parameters to control displacement
     if True:
         displace = [0, 0, molecular_distance_z * random.random()]
         molecules.translate(displace)
@@ -153,12 +158,13 @@ def add_molecules(cnt):
 
 def set_cell(system, cnt):
     """Set the cell parameter of the system according to the CNT dimensions
+
     Parameters
     ----------
     System: The CNT with the molecules
     cnt: The CNT itself
     """
-    # TODO: If attach_randomly was used check all molecules are inside the CNT
+    # TODO: If attach_randomly was used check that all molecules are inside the CNT
     # (maybe we do not need all molecules inside?)
 
     cnt_gap = config.cnt_gap
@@ -185,17 +191,40 @@ def get_calculator_parameters():
         kpts = tuple(config.kpts)
     else:
         kpts = None
+    nproc = config.nproc
 
-    if not config.nproc or not isinstance(config.nproc, int) or config.nproc < 1:
+    if nproc is not None and not isinstance(nproc, int) or nproc < 1:
         print("Error: invalid value for nproc in config file.")
         sys.exit(1)
-    command = f"mpiexec -np {config.nproc} pw.x < espresso.pwi > espresso.pwo"
 
+    command = None
+    if nproc is not None:
+        command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
     return input_params, pseudos, kpts, command
 
-# -----------------------
-# Write some files
-# -----------------------
+
+def set_calculator_parameters():
+    """ Set the calculator parameters from config object"""
+
+    # TODO: When adding support for more calculators, come here and tweak it
+    input_params, pseudos, kpts, command = get_calculator_parameters()
+    if command:
+        calc = Espresso(input_data=input_params,
+                        pseudopotentials=pseudos,
+                        kpts=kpts,
+                        command=command)
+
+    else:
+        calc = Espresso(input_data=input_params,
+                        pseudopotentials=pseudos,
+                        kpts=kpts)
+    return calc
+# -------------------------
+# Write files
+# -------------------------
+
+# TODO: write input files without running the calculation?
+# Is it possible with ASE?
 
 # NOTE: the write command does NOT write the calculation parameters
 # in the written file :( write( 'system.in', system, format='espresso-in')
@@ -214,7 +243,7 @@ def set_calculation_folder():
     import uuid
     items = (str(config.prefix),
              str(config.cnt_n) + '-' + str(config.cnt_m),
-             str(config.cnt_l),
+             'len-' + str(config.cnt_l),
              str(config.n_molecules) + str(config.molec),
              )
     d = '_'.join(items)
@@ -225,6 +254,7 @@ def set_calculation_folder():
     try:
         calcdir.mkdir(exist_ok=False)
     except FileExistsError:
+        # Really??! o.O Well, try again...
         set_calculation_folder()
 
     logging.info(f'folder created: {calcdir}')
@@ -233,5 +263,6 @@ def set_calculation_folder():
 
 
 def visualize(system):
+    """Uses ASE GUI to visualize the system"""
     if config.visualize:
         view(system, repeat=config.vis_repeat)
