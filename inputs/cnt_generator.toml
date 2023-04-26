@@ -19,7 +19,7 @@ rot_axis = ['x', 'z', 'y']
 # Rotations for each molecule (in degrees) 
 # (Non mandatory)
 rot_x = 90
-rot_y = {'min' = -25, 'max' = 25}
+rot_y = {'min' = -25.0, 'max' = 25.0}
 rot_z = {'min' = 0, 'max' = 360}
 
 [cnt]
@@ -27,6 +27,7 @@ rot_z = {'min' = 0, 'max' = 360}
 cnt_n = 8
 cnt_m = 0
 cnt_l = 2    # Repetition units of a single CNT
+cnt_bond = 1.42  # Bond lenght in the CNT
 cnt_gap = 4  # Distance betwen CNTs (Ang)
 constraints = 'all'
 

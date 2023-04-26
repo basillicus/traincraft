@@ -27,14 +27,32 @@ class Config:
         method:
             config.get(key='key1.key2', default )
 
-        being config and object of the Class Config:
+        where config is an object of the Class Config:
             config = Config(configfile)
         """
+
+        self.title = self.config.get('title', 'untitled')
+        print('Reading parameters for work:', self.title)
+
+        print('  Reading geometry parameters...', end='')
+        self._read_geometry_parameters()
+        print('OK!')
+        print('  Reading visualize parameters...', end='')
+        self._read_visualize_parameters()
+        print('OK!')
+        print('  Reading calculator parameters...', end='')
+        self._read_calculator_parameters()
+        print('OK!')
+        print('  Reading configuration parameters...', end='')
+        self._read_configuration_parameters()
+        print('OK!')
+
+    def _read_geometry_parameters(self):
+        """ Called by read_parameters().
+        Gets geometry parameters from config file"""
+
         self.n_structures = self.config['structures'].get('n_structures', 3)
 
-        # ---------------------------
-        # System Geometry parameters
-        # ---------------------------
         self.molec = self.config['molecules'].get('molecule', 'CO2')
         self.n_molecules = self.config['molecules'].get('n_molecules', 2)
         self.compresion_factor = self.config['molecules'].get(
@@ -53,18 +71,20 @@ class Config:
         self.cnt_n = self.config['cnt'].get('cnt_n', 8)
         self.cnt_m = self.config['cnt'].get('cnt_m', 0)
         self.cnt_l = self.config['cnt'].get('cnt_l', 2)
+        self.cnt_bond = self.config['cnt'].get('cnt_bond', 1.43)
         self.cnt_gap = self.config['cnt'].get('cnt_gap', 4.0)
         self.cnt_constraints = self.config['cnt'].get('constraints', 'all')
 
-        # ---------------------------
-        # Visualization parameters
-        # ---------------------------
+    def _read_visualize_parameters(self):
+        """ Called by read_parameters().
+        Gets visualize parameters from config file"""
         self.visualize = self.config['visualize'].get('visualize', True)
         self.vis_repeat = self.config['visualize'].get('repeat', [2, 2, 2])
 
-        # ---------------------------
-        # Calculation parameters
-        # ---------------------------
+    def _read_calculator_parameters(self):
+        """ Called by read_parameters().
+        Gets calculator parameters from config file"""
+
         self.calculator = self.config['calculator'].get('calculator', 'qe')
         self.calculate_e = self.config['calculator'].get(
             'calculate_energies', False)
@@ -100,9 +120,10 @@ class Config:
         self.pseudos = self.config['calculator']['qe'].get(
             'pseudos', default_pseudos)
 
-        # ---------------------------
-        # General configuration parameters
-        # ---------------------------
+    def _read_configuration_parameters(self):
+        """ Called by read_parameters().
+        Gets configuration parameters from config file"""
+
         # config
         self.random_seed = self.config['config'].get('random_seed', True)
         self.seed = self.config['config'].get('seed', 42)

@@ -83,6 +83,8 @@ for structure in range(structures):
 
     # if rank == 0:
     os.chdir(tk.set_calculation_folder())
+    # Write input files, should you want to run calculations manually
+    system.calc.write_input(system)
 
     if (config.calculate_e):
         logging.info('  Calculating energy...')

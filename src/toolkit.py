@@ -7,6 +7,7 @@ import numpy as np
 
 from config import config
 
+from ase import Atoms
 from ase.calculators.espresso import Espresso
 from ase.build import nanotube
 from ase.build import molecule
@@ -54,8 +55,10 @@ def create_nanotube():
     """
 
     n, m, lenght = config.cnt_n, config.cnt_m, config.cnt_l
+    bond_lenght = config.cnt_bond
     constraints = config.cnt_constraints
-    cnt = nanotube(n, m, length=lenght)
+
+    cnt = nanotube(n, m, length=lenght, bond=bond_lenght)
 
     # mask = [atom.symbol == 'C' for atom in cnt]
     if constraints == 'all':
@@ -126,6 +129,9 @@ def add_molecules(cnt):
                 molecule.rotate(get_rotation_angle(rot_y), 'y')
             if ax == 'z':
                 molecule.rotate(get_rotation_angle(rot_z), 'z')
+
+    if n_molecules <= 0:
+        return Atoms()
 
     # It will arrange the molecules along the Z axis of the CNT
     molecular_distance_z = (
