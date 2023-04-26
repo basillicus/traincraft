@@ -113,6 +113,15 @@ def add_molecules(cnt):
 
     rot_axis = config.molec_rot_axis
 
+    def rotate_molecule(molecule, axis=['x', 'y', 'z']):
+        for ax in axis:
+            if ax == 'x':
+                molecule.rotate(get_rotation_angle(rot_x), 'x')
+            if ax == 'y':
+                molecule.rotate(get_rotation_angle(rot_y), 'y')
+            if ax == 'z':
+                molecule.rotate(get_rotation_angle(rot_z), 'z')
+
     def get_rotation_angle(angle):
         if angle is None:
             return 0
@@ -121,44 +130,31 @@ def add_molecules(cnt):
         else:
             return angle
 
-    def rotate_molecule(molecule, axis=['x', 'y', 'z']):
-        for ax in axis:
-            if ax == 'x' and rot_x:
-                molecule.rotate(get_rotation_angle(rot_x), 'x')
-            if ax == 'y':
-                molecule.rotate(get_rotation_angle(rot_y), 'y')
-            if ax == 'z':
-                molecule.rotate(get_rotation_angle(rot_z), 'z')
-
-    if n_molecules <= 0:
-        return Atoms()
-
     # It will arrange the molecules along the Z axis of the CNT
-    molecular_distance_z = (
-        cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
-
-    molecules = molecule(molec)
+    if n_molecules > 0:
+        molecular_distance_z = (
+            cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
 
     rotate = rot_x or rot_y or rot_z
 
-    # Orient the first molecule
-    if rotate:
-        # Rotate molecules
-        rotate_molecule(molecules, rot_axis)
-
-    # TODO: Add parameters to control displacement
-    if True:
-        displace = [0, 0, molecular_distance_z * random.random()]
-        molecules.translate(displace)
-
-    # Add remaining molecules
-    for m in range(1, n_molecules):
+    molecules = Atoms()
+    # Add molecules
+    for m in range(0, n_molecules):
         mmol = molecule(molec)
         if rotate:
             rotate_molecule(mmol, rot_axis)
-        molecules = attach(molecules, mmol,
-                           distance=molecular_distance_z,
-                           direction=(0, 0, 1))
+
+        if m == 0:
+            # TODO: Add parameters to control displacement
+            if True:
+                # Displace the first molecule
+                displace = [0, 0, molecular_distance_z * random.random()]
+                mmol.translate(displace)
+            molecules = mmol
+        else:
+            molecules = attach(molecules, mmol,
+                               distance=molecular_distance_z,
+                               direction=(0, 0, 1))
     return molecules
 
 
@@ -170,8 +166,8 @@ def set_cell(system, cnt):
     System: The CNT with the molecules
     cnt: The CNT itself
     """
-    # TODO: If attach_randomly was used check that all molecules are inside the CNT
-    # (maybe we do not need all molecules inside?)
+    # TODO: If attach_randomly was used check that all molecules are
+    # inside the CNT (maybe we do not need all molecules inside?)
 
     cnt_gap = config.cnt_gap
 

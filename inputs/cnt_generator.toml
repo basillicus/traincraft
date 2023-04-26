@@ -1,3 +1,7 @@
+# Input file example
+
+title = 'Input file example. Can be used as a reference'
+
 # ----------------------------
 # Building geometry parameters
 # ----------------------------
@@ -11,7 +15,8 @@ compresion_factor = 1.0  # How close molecules will be inside the CNT
 
 # TODO: Add posibility for totally random rotation?
 #
-# Axis order in which rotations will be performed, the same axis can be given several times, so several rotations will be performd
+# Axis order in which rotations will be performed, the same axis can be given
+# several times, so several rotations will be performd
 # Non mandatory. Default is ['x', 'y', 'z']
 # rot_axis = ['y', 'x', 'z', 'y']
 rot_axis = ['x', 'z', 'y']
@@ -37,7 +42,7 @@ constraints = 'all'
 [calculator]
 calculator = 'qe'  # Use Quantum Espresso to calculate enrgies/forces
 calculate_energies = false
-calculate_forces = true
+calculate_forces = false
 
   # Set the calculator parameters
   [calculator.qe]
@@ -84,5 +89,5 @@ folder_prefix = 'cnt'
 logfile = 'logfile.log'
 # outdir = './'
 
-# Parallelization
+# Parallelization (Experimental!)
 # nproc = 4   # Number of MPI processes to run qe as: mpiexec -np nproc ...
