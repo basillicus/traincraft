@@ -3,6 +3,18 @@ from pathlib import Path
 
 
 class Config:
+    """
+    A class for loading and accessing configuration parameters from a TOML file.
+
+    Usage:
+    config = Config('config.toml')
+    config.read_parameters()
+    value = config.get('key', default)
+
+    Parameters:
+    configfile (str): Path to the TOML configuration file.
+    """
+
     def __init__(self, configfile):
         self.configfile = configfile
         self._config = None

@@ -9,6 +9,7 @@ if len(sys.argv) > 1:
 # Create config object and get parameters from configfile
 config = Config(configfile)
 config.read_parameters()
+print(config.__dict__)
 
 # Initialize logging file
 logging.basicConfig(filename=config.logfile, level=logging.INFO,

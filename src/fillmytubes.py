@@ -34,6 +34,7 @@ PARAMETERS (read from a config.toml file)
 
     - cnt_n, cnt_m: (int, int), [8], [0] n and m nanotube vectors
     - cnt_l: (int), [2] Repetition units of a single CNT along its Z axis
+    - cnt_bond (float), [1.43] CNT C-C bond lenght
     - cnt_gap: (float), [4] Distance betwen neighbour CNTs (Ang)
 
 OUTPUT:

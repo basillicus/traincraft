@@ -1,6 +1,5 @@
-# Input file example
-
-title = 'Input file example. Can be used as a reference'
+# Work input file in TOML format
+title = 'Input file example. Use as a reference'
 
 # ----------------------------
 # Building geometry parameters
