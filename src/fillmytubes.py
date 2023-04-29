@@ -88,11 +88,18 @@ for structure in range(structures):
     system.calc.write_input(system)
 
     if (config.calculate_e):
-        logging.info('  Calculating energy...')
-        system.get_total_energy()
-        logging.info('  Energy calculation finished')
+        try:
+            logging.info('  Calculating energy...')
+            system.get_total_energy()
+            logging.info('  Energy calculation finished')
+        except:
+            logging.error(' QEspresso finished with error. Check output')
     if (config.calculate_f):
-        logging.info('  Calculating forces...')
-        system.get_forces()
-        logging.info('  Forces calculation finished')
+        try:
+            logging.info('  Calculating forces...')
+            system.get_forces()
+            logging.info('  Forces calculation finished')
+        except:
+            logging.error(' QEspresso finished with error. Check output')
+
     os.chdir(config.cwd)
