@@ -63,7 +63,7 @@ for structure in range(structures):
 
     # Add molecules and CNT together
     system = cnt + molecules
-    tk.set_cell(system, cnt)
+    tk.set_cell(system)
 
     # -----------------------
     # Visualize the system

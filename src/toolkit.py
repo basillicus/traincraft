@@ -134,6 +134,7 @@ def add_molecules(cnt):
     if n_molecules > 0:
         molecular_distance_z = (
             cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
+        print('molecular distance', molecular_distance_z)
 
     rotate = rot_x or rot_y or rot_z
 
@@ -143,7 +144,6 @@ def add_molecules(cnt):
         mmol = molecule(molec)
         if rotate:
             rotate_molecule(mmol, rot_axis)
-
         if m == 0:
             # TODO: Add parameters to control displacement
             if True:
@@ -151,6 +151,7 @@ def add_molecules(cnt):
                 displace = [0, 0, molecular_distance_z * random.random()]
                 mmol.translate(displace)
             molecules = mmol
+
         else:
             molecules = attach(molecules, mmol,
                                distance=molecular_distance_z,
@@ -158,30 +159,31 @@ def add_molecules(cnt):
     return molecules
 
 
-def set_cell(system, cnt):
+def set_cell(system):
     """Set the cell parameter of the system according to the CNT dimensions
 
     Parameters
     ----------
     System: The CNT with the molecules
-    cnt: The CNT itself
     """
     # TODO: If attach_randomly was used check that all molecules are
     # inside the CNT (maybe we do not need all molecules inside?)
 
     cnt_gap = config.cnt_gap
+    system.center(vacuum=cnt_gap/2, axis=(0, 1))
 
-    # Get the limits of the CNT
-    cnt_xyz = cnt.get_positions()
-    min_x, max_x = min(cnt_xyz[:, 0]), max(cnt_xyz[:, 0])
-    min_y, max_y = min(cnt_xyz[:, 1]), max(cnt_xyz[:, 1])
-    # min_z, max_z = min(cnt_xyz[:, 2]), max(cnt_xyz[:, 2])
-    cell_z = cnt.get_cell()[2][2]
+    # OLD Manual Way
+    # # Get the limits of the CNT
+    # cnt_xyz = cnt.get_positions()
+    # min_x, max_x = min(cnt_xyz[:, 0]), max(cnt_xyz[:, 0])
+    # min_y, max_y = min(cnt_xyz[:, 1]), max(cnt_xyz[:, 1])
+    # # min_z, max_z = min(cnt_xyz[:, 2]), max(cnt_xyz[:, 2])
+    # cell_z = cnt.get_cell()[2][2]
 
-    cell_x = [(max_x - min_x + cnt_gap), 0, 0]
-    cell_y = [0, (max_y - min_y + cnt_gap), 0]
-    cell_z = cnt.get_cell()[2]  # Use the lattice parameter Z of the CNT
-    system.set_cell([cell_x, cell_y, cell_z])
+    # cell_x = [(max_x - min_x + cnt_gap), 0, 0]
+    # cell_y = [0, (max_y - min_y + cnt_gap), 0]
+    # cell_z = cnt.get_cell()[2]  # Use the lattice parameter Z of the CNT
+    # system.set_cell([cell_x, cell_y, cell_z])
 
 
 def get_calculator_parameters():
