@@ -1,45 +1,119 @@
-**Edit a file, create a new file, and clone from Bitbucket in under 2 minutes**
+`Fillmytubes`  generates randomly filled carbon nanotubes with small molecules, calculates the energies and forces of each geometry. 
 
-When you're done, you can delete the content in this README and update the file with details for others getting started with your repository.
-
-*We recommend that you open this README in another tab as you perform the tasks below. You can [watch our video](https://youtu.be/0ocf7u76WSo) for a full demo of all the steps in this tutorial. Open the video in a new tab to avoid leaving Bitbucket.*
-
----
-
-## Edit a file
-
-You’ll start by editing this README file to learn how to edit a file in Bitbucket.
-
-1. Click **Source** on the left side.
-2. Click the README.md link from the list of files.
-3. Click the **Edit** button.
-4. Delete the following text: *Delete this line to make a change to the README from Bitbucket.*
-5. After making your change, click **Commit** and then **Commit** again in the dialog. The commit page will open and you’ll see the change you just made.
-6. Go back to the **Source** page.
+TODO: 
+ - Generate Machine Larned force fields for the required system 
+ - Run molecular dynamics with the generated force fields
+ - Calculate the Raman spectra from the MD using a ML methodology (to be developed in Viena)
 
 ---
 
-## Create a file
+## Required packages
 
-Next, you’ll add a new file to this repository.
+Install the following packeges via pip or conda
 
-1. Click the **New file** button at the top of the **Source** page.
-2. Give the file a filename of **contributors.txt**.
-3. Enter your name in the empty file space.
-4. Click **Commit** and then **Commit** again in the dialog.
-5. Go back to the **Source** page.
-
-Before you move on, go ahead and explore the repository. You've already seen the **Source** page, but check out the **Commits**, **Branches**, and **Settings** pages.
+1. ASE
+2. tomlkit
+3. Quantum Espresso (qe)
+4. Mdanalysis
+5. mdapackmol (installation via pip)
+6. Packmol
 
 ---
 
-## Clone a repository
+## Input file
 
-Use these steps to clone from SourceTree, our client for using the repository command-line free. Cloning allows you to work on your files locally. If you don't yet have SourceTree, [download and install first](https://www.sourcetreeapp.com/). If you prefer to clone from the command line, see [Clone a repository](https://confluence.atlassian.com/x/4whODQ).
+`Fillmytubes` uses a toml file as input. As an example, use:
 
-1. You’ll see the clone button under the **Source** heading. Click that button.
-2. Now click **Check out in SourceTree**. You may need to create a SourceTree account or log in.
-3. When you see the **Clone New** dialog in SourceTree, update the destination path and name if you’d like to and then click **Clone**.
-4. Open the directory you just created to see your repository’s files.
+```
+## Keywords
 
-Now that you're more familiar with your Bitbucket repository, go ahead and add a new file locally. You can [push your change back to Bitbucket with SourceTree](https://confluence.atlassian.com/x/iqyBMg), or you can [add, commit,](https://confluence.atlassian.com/x/8QhODQ) and [push from the command line](https://confluence.atlassian.com/x/NQ0zDQ).
+title = 'Input file example. Use it as a reference'
+
+# ------------------------------
+# Building geometry parameters
+# ------------------------------
+
+[structures]
+n_structures = 10  # Total number of random geometries to be generated
+
+[molecules]
+molecule = 'CO2'
+n_molecules = 6
+compresion_factor = 1.0  # How close molecules will be inside the CNT
+
+# Axis order in which rotations will be performed, the same axis can be given
+# several times, so several rotations will be performd
+# Non mandatory. Default is ['x', 'y', 'z']
+# rot_axis = ['y', 'x', 'z', 'y']
+rot_axis = ['x', 'z', 'y']
+
+# Rotations for each molecule (in degrees) 
+# (Non mandatory)
+rot_x = 90
+rot_y = {'min' = -25.0, 'max' = 25.0}
+rot_z = {'min' = 0, 'max' = 360}
+
+[cnt]
+# n,m nanotube vectors
+cnt_n = 8
+cnt_m = 0
+cnt_l = 2        # Repetition units of a single CNT
+cnt_bond = 1.42  # Bond lenght in the CNT
+cnt_gap = 4      # Distance betwen CNTs (Ang)
+constraints = 'all'  # all: fix all nantoube atoms | none: none are fix
+
+# ---------------------------
+# Calculation parameters
+# ---------------------------
+[calculator]
+calculator = 'qe'  # Use Quantum Espresso to calculate enrgies/forces
+calculate_forces = false
+
+  # Set the calculator parameters
+  [calculator.qe]
+    # calculation = 'scf'  # Commented calculation
+    calculation = 'relax'  # QE kind of calculation: scf|relax|vc-relax
+    # ecutwfc = 30         # commented plane-wave wave-function cutoff
+    ecutwfc = 45           # plane-wave wave-function cutoff
+    ecutrho = 180          # density wave-function cutoff,
+    conv_thr = 1e-8        # DFT self-consistency convergence
+    forc_conv_thr = 1e-3   # Force convergence threshold
+    etot_conv_thr = 1e-5   # Total energy convergence threshold
+    nstep = 100            # Total ionic steps
+    pseudo_dir = "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/"
+    vdw_corr = "xdm"       # Dispersion interactions
+    occupations = "smearing"   # Add smearing
+    smearing = "cold"      # smearing kind
+    degauss = 0.02         # smearing amount
+    tprnfor = true         # Print forces
+    tstress = true         # Print stress tensor
+    kpts = [1,1,2]         # [Kx, Ky, Kz] or Not given|None: will use Gamma point only
+
+    [calculator.qe.pseudos]
+      C = 'C.pbe-n-kjpaw_psl.1.0.0.UPF'
+      O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
+
+# ---------------------------
+# Visualization parameters
+# ---------------------------
+[visualize]
+# You wanna see the geometries?
+visualize = true
+# repeat = [1,1,3]   # Repetion of the unit cell for visualization pourposes only
+
+# ---------------------------
+# General configuration stuff
+# ---------------------------
+[config]
+# Random things
+random_seed = true
+# seed = 42  # If random_seed is false, use this seed instead
+
+# Paths and files
+folder_prefix = 'cnt'
+logfile = 'logfile.log'
+# outdir = './'
+
+# Parallelization (Experimental!)
+# nproc = 4   # Number of MPI processes to run qe as: mpiexec -np nproc ...
+```

@@ -10,11 +10,12 @@ import logging
 # from ase.calculators.emt import EMT
 
 # TODO:
-# x Generate M different geometries
-# - Add results to the database
-# - Compare similarity between generated structures
-# - Analyse results
-# - Add more calculators
+# v Generate M different geometries
+# ~ Add results to the database (Done in separate script so far)
+# o Better geometries generation  --> Packmol?
+# o Compare similarity between generated structures?
+# o Analyse results
+# o Add more calculators
 
 """
 Creates CNT randomly filled with small molecules and calculates their energies
@@ -39,10 +40,10 @@ PARAMETERS (read from a config.toml file)
 
 OUTPUT:
 -------
-    Visualizes the system if requested in config file
-    After running the calculation:
-        QE input file
-        QE output files
+    - Visualizes the system if requested in config file
+    - a QE input file for each generated geometry
+    - After running the calculation:
+        - QE output files
 
 """
 

@@ -6,3 +6,5 @@
 ase
 tomlkit
 qe
+mdanalysis
+mdapackmol
