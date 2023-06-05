@@ -9,14 +9,17 @@ TODO:
 
 ## Required packages
 
-Install the following packeges via pip or conda
+Install the following packages via pip or conda
 
 1. ASE
 2. tomlkit
 3. Quantum Espresso (qe)
 4. Mdanalysis
-5. mdapackmol (installation via pip)
+5. mdapackmol-fmt (installation via pip)
+  It is a forked version of mdapackmol
+    pip install mdapackmol-fmt
 6. Packmol
+7. Torchani
 
 ---
 
@@ -33,25 +36,33 @@ title = 'Input file example. Use it as a reference'
 # Building geometry parameters
 # ------------------------------
 
+# By default, geometries will be generated using Packmol code. 
+# For manual control, set it to manual. Then rot_axis and rot_* will be used.
+# geom_generation = 'manual'    # Default: 'packmol'
+
+
 [structures]
 n_structures = 10  # Total number of random geometries to be generated
 
 [molecules]
 molecule = 'CO2'
 n_molecules = 6
-compresion_factor = 1.0  # How close molecules will be inside the CNT
+tolerance = 2.0  # Minimum distance between molecules when packing (for Packmol)
 
-# Axis order in which rotations will be performed, the same axis can be given
-# several times, so several rotations will be performd
-# Non mandatory. Default is ['x', 'y', 'z']
-# rot_axis = ['y', 'x', 'z', 'y']
-rot_axis = ['x', 'z', 'y']
+# If geom_generation == 'manual':
 
-# Rotations for each molecule (in degrees) 
-# (Non mandatory)
-rot_x = 90
-rot_y = {'min' = -25.0, 'max' = 25.0}
-rot_z = {'min' = 0, 'max' = 360}
+    compresion_factor = 1.0  # How close molecules will be inside the CNT
+
+    # Axis order in which molecule rotations will be performed, the same axis can be given    # several times, so several rotations will be performed.
+    # Non mandatory. Default is ['x', 'y', 'z']
+    # rot_axis = ['y', 'x', 'z', 'y']
+    rot_axis = ['x', 'z', 'y']
+    
+    # Rotations for each molecule (in degrees) 
+    # (Non mandatory)
+    rot_x = 90
+    rot_y = {'min' = -25.0, 'max' = 25.0}
+    rot_z = {'min' = 0, 'max' = 360}
 
 [cnt]
 # n,m nanotube vectors

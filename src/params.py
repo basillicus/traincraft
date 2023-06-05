@@ -63,14 +63,18 @@ class Config:
         """ Called by read_parameters().
         Gets geometry parameters from config file"""
 
+        self.geom_generation = self.config.get('geom_generation', 'packmol')
+
         self.n_structures = self.config['structures'].get('n_structures', 3)
 
+        self.tolerance = self.config['molecules'].get('tolerance', 2.0)
         self.molec = self.config['molecules'].get('molecule', 'CO2')
         self.n_molecules = self.config['molecules'].get('n_molecules', 2)
+
+        # Molecules manual manipulation
         self.compresion_factor = self.config['molecules'].get(
             'compresion_factor', 1.0)
 
-        # Molecules manipulation
         self.tilt_factor = self.config['molecules'].get('tilt_factor', None)
         self.molec_rot_x = self.config['molecules'].get('rot_x', None)
         self.molec_rot_y = self.config['molecules'].get('rot_y', None)

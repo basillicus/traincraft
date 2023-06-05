@@ -6,5 +6,6 @@
 ase
 tomlkit
 qe
+packmol
 mdanalysis
-mdapackmol
+torchani

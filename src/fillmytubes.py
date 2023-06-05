@@ -55,16 +55,19 @@ tk.set_seed()
 
 structures = config.n_structures
 for structure in range(structures):
+    # if rank == 0:
+    os.chdir(tk.set_calculation_folder())
 
     # -----------------------
     # Create the geometries
     # -----------------------
-    cnt = tk.create_nanotube()
-    molecules = tk.add_molecules(cnt)
+
+    system = tk.generate_geometry()
 
     # Add molecules and CNT together
-    system = cnt + molecules
     tk.set_cell(system)
+    # KKK
+    print('FILLMYTUBES system cell:', system.get_cell())
 
     # -----------------------
     # Visualize the system
@@ -80,13 +83,16 @@ for structure in range(structures):
     # system.calc = EMT()
 
     calc = tk.set_calculator_parameters()
+
     # system.set_calculator(calc_QE)  # Deprecated
     system.calc = calc
 
-    # if rank == 0:
-    os.chdir(tk.set_calculation_folder())
     # Write input files, should you want to run calculations manually
     system.calc.write_input(system)
+
+    print("Sampling Geometries from MD...")
+    tk.run_MD(system)
+    print("MD FINISHED")
 
     if (config.calculate_e):
         try:
