@@ -1,2 +1,3 @@
 # Install via pip
 mdapackmol-fmt
+tblite

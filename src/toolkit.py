@@ -311,20 +311,33 @@ def get_calculator_parameters():
         command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
     return input_params, pseudos, kpts, command
 
-def run_MD(system, calculator='ani', fmax=0.001, sample_format='pdb'):
+def run_MD(system, calculator='tblite', fmax=0.001, sample_format='pdb'):
     """
-    Performs a Molecular Dynamic using ANI (ANAKIN-ME like Deep Learning potentials)
+    Performs a Molecular Dynamic using as calculator:
+     - ani: ANI (ANAKIN-ME like Deep Learning potentials)
+     - xtb:
+     - tblite:
     """
 
-    from ase.md.langevin import Langevin
+    from ase.io import write
+    from ase import units
     from ase.optimize import BFGS
     from ase.io.trajectory import Trajectory
-    from ase.io import read, write
-    from ase import units
-    import torchani
+    from ase.md.langevin import Langevin
 
-    calculator = torchani.models.ANI1ccx().ase()
+    # Set calculators
+    if calculator == 'ani':
+        import torchani
+        calculator = torchani.models.ANI1ccx().ase()
+    elif calculator == 'xtb':
+        from xtb.ase.calculator import XTB
+        calculator = XTB(method="GFN2-xTB")
+    elif calculator == 'tblite':
+        from tblite.ase import TBLite
+        # calculator = TBLite(method="GFN1-xTB")
+        calculator = TBLite(method="GFN2-xTB")
 
+    # system.pbc = np.array([False, False, False])
     system.calc = calculator
 
     def sample_geometry(format='extxyz'):
@@ -332,7 +345,7 @@ def run_MD(system, calculator='ani', fmax=0.001, sample_format='pdb'):
         import uuid
         calcfile = str(uuid.uuid4()).split('-')[0]
         write(calcfile + '.' + format, system)
-        write('trajectory.xyz', system, append=True)
+        write('trajectory.extxyz', system, append=True)
         print("Geometry sampled")
 
     # First  let's minimize the structure:
@@ -340,14 +353,14 @@ def run_MD(system, calculator='ani', fmax=0.001, sample_format='pdb'):
     opt = BFGS(system)
     opt.run(fmax=0.001)
 
-    dyn = Langevin(system, 1 * units.fs, 300 * units.kB, 0.2)
+    dyn = Langevin(system, 1 * units.fs, 500 * units.kB, 0.2)
 
-    traj = Trajectory('md_torchani.traj', 'w', system)
+    traj = Trajectory('md.traj', 'w', system)
     dyn.attach(traj.write, interval=20)
     dyn.attach(sample_geometry, interval=20)
 
     print("Beginning dynamics...")
-    dyn.run(10000)
+    dyn.run(1000)
 
 
 def set_calculator_parameters():

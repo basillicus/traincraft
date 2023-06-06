@@ -1,6 +1,6 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
-# Alterantively mamba or micromamba can also be used
+# Alterantively (recomended) mamba or micromamba can also be used
 # $ mamba create --name <env> --file <this file>
 # platform: linux-64
 ase
@@ -8,4 +8,5 @@ tomlkit
 qe
 packmol
 mdanalysis
-torchani
+# torchani
+

@@ -66,8 +66,6 @@ for structure in range(structures):
 
     # Add molecules and CNT together
     tk.set_cell(system)
-    # KKK
-    print('FILLMYTUBES system cell:', system.get_cell())
 
     # -----------------------
     # Visualize the system
@@ -90,9 +88,7 @@ for structure in range(structures):
     # Write input files, should you want to run calculations manually
     system.calc.write_input(system)
 
-    print("Sampling Geometries from MD...")
     tk.run_MD(system)
-    print("MD FINISHED")
 
     if (config.calculate_e):
         try:
