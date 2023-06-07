@@ -2,7 +2,8 @@ import os
 
 import toolkit as tk
 from config import config
-import logging
+
+# import logging
 
 # from ase.parallel import MPI
 
@@ -11,15 +12,15 @@ import logging
 
 # TODO:
 # v Generate M different geometries
-# ~ Add results to the database (Done in separate script so far)
-# o Better geometries generation  --> Packmol?
+# ~ Add results to the database (Done in separate script so far) v Better geometries generation  --> Packmol
+# v Generate sampling geometries --> From Tight Bidning MD
 # o Compare similarity between generated structures?
 # o Analyse results
 # o Add more calculators
 
 """
 Creates CNT randomly filled with small molecules and calculates their energies
-and/or forces.
+and/or forces for training ML potentials
 
 PARAMETERS (read from a config.toml file)
 ----------
@@ -46,10 +47,7 @@ OUTPUT:
         - QE output files
 
 """
-
-# comm = MPI.COMM_WORLD
-# rank = comm.rank
-
+#
 # Order the chaos
 tk.set_seed()
 
@@ -80,29 +78,19 @@ for structure in range(structures):
     # EMT is just for testing pourposes, EMT breaks CO2 molecules
     # system.calc = EMT()
 
-    calc = tk.set_calculator_parameters()
-
+    calc = tk.set_DFT_calculator_parameters()
     # system.set_calculator(calc_QE)  # Deprecated
     system.calc = calc
-
     # Write input files, should you want to run calculations manually
     system.calc.write_input(system)
 
-    tk.run_MD(system)
+    # Generate rattled structures via MD using DFTB
+    # FIXME: This parameteres are for testing. Remove before uploading public version
+    # TODO: Allow somehow control this parameteres too.
+    # But needs to be a good trade between usability and flexibilty
+    tk.run_MD(system, md_steps=100, preoptimize=False, preopt_maxsteps=3)
 
-    if (config.calculate_e):
-        try:
-            logging.info('  Calculating energy...')
-            system.get_total_energy()
-            logging.info('  Energy calculation finished')
-        except:
-            logging.error(' QEspresso finished with error. Check output')
-    if (config.calculate_f):
-        try:
-            logging.info('  Calculating forces...')
-            system.get_forces()
-            logging.info('  Forces calculation finished')
-        except:
-            logging.error(' QEspresso finished with error. Check output')
+    # Go through all the generated extxyz files and calcute their DFT forces
+    tk.get_QM_forces()
 
     os.chdir(config.cwd)

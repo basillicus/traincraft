@@ -291,7 +291,7 @@ def set_cell(system):
     # system.set_cell([cell_x, cell_y, cell_z])
 
 
-def get_calculator_parameters():
+def get_DFT_calculator_parameters():
     """ Get the calculator parameters from config object"""
 
     input_params = config.input_params
@@ -311,12 +311,15 @@ def get_calculator_parameters():
         command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
     return input_params, pseudos, kpts, command
 
-def run_MD(system, calculator='tblite', fmax=0.001, sample_format='pdb'):
+
+def run_MD(system, method='tblite', fmax=0.001, sampling_interval=20,
+           temperature=500, md_steps=1000, preoptimize=True, preopt_maxsteps=None):
     """
     Performs a Molecular Dynamic using as calculator:
-     - ani: ANI (ANAKIN-ME like Deep Learning potentials)
-     - xtb:
-     - tblite:
+     - ani: torchani (ANAKIN-ME like Deep Learning potentials)
+     - xtb: DFTB (does not work on periodic systems)
+     - tblite: DFTB (works on periodic systems)
+    It can preoptimize the geometry before start the MD
     """
 
     from ase.io import write
@@ -325,14 +328,16 @@ def run_MD(system, calculator='tblite', fmax=0.001, sample_format='pdb'):
     from ase.io.trajectory import Trajectory
     from ase.md.langevin import Langevin
 
+    from math import floor
+
     # Set calculators
-    if calculator == 'ani':
+    if method == 'ani':
         import torchani
         calculator = torchani.models.ANI1ccx().ase()
-    elif calculator == 'xtb':
+    elif method == 'xtb':
         from xtb.ase.calculator import XTB
         calculator = XTB(method="GFN2-xTB")
-    elif calculator == 'tblite':
+    elif method == 'tblite':
         from tblite.ase import TBLite
         # calculator = TBLite(method="GFN1-xTB")
         calculator = TBLite(method="GFN2-xTB")
@@ -340,34 +345,44 @@ def run_MD(system, calculator='tblite', fmax=0.001, sample_format='pdb'):
     # system.pbc = np.array([False, False, False])
     system.calc = calculator
 
+    if preoptimize:
+        # Geometry minimization the structure:
+        logging.info(f'Preoptimising with {method}; F_max = {fmax}; max steps = {preopt_maxsteps}')
+        opt = BFGS(system, maxstep=preopt_maxsteps)
+        opt.run(fmax=fmax)
+
     def sample_geometry(format='extxyz'):
-        """Saves a geometry from the MD"""
+        """Samples a geometry from the MD"""
         import uuid
         calcfile = str(uuid.uuid4()).split('-')[0]
-        write(calcfile + '.' + format, system)
-        write('trajectory.extxyz', system, append=True)
-        print("Geometry sampled")
 
-    # First  let's minimize the structure:
-    print("Begin minimizing...")
-    opt = BFGS(system)
-    opt.run(fmax=0.001)
+        # Define the subfolder path to save the sampled geometries
+        sampling_subfolder = "MD_sampled_geometries"
+        os.makedirs(sampling_subfolder, exist_ok=True)
 
-    dyn = Langevin(system, 1 * units.fs, 500 * units.kB, 0.2)
+        # Save the sampled geometry in the subfolder
+        filepath = os.path.join(sampling_subfolder, calcfile + '.' + format)
+        write(filepath, system)
+        # write('trajectory.extxyz', system, append=True)
+
+    dyn = Langevin(system, 1 * units.fs, temperature * units.kB, 0.2)
 
     traj = Trajectory('md.traj', 'w', system)
-    dyn.attach(traj.write, interval=20)
-    dyn.attach(sample_geometry, interval=20)
+    dyn.attach(traj.write, interval=sampling_interval)
+    dyn.attach(sample_geometry, interval=sampling_interval)
 
-    print("Beginning dynamics...")
-    dyn.run(1000)
+    logging.info(f'MD with {calculator} started:')
+    logging.info(f'  T = {temperature}; MD steps = {md_steps}; sampling every {sampling_interval} steps')
+    dyn.run(md_steps)
+    sampled_structures = floor(md_steps/sampling_interval)
+    logging.info(f'  MD finished. Saved in md.traj. Sampled {sampled_structures} strcutures')
 
 
-def set_calculator_parameters():
+def set_DFT_calculator_parameters():
     """ Set the calculator parameters from config object"""
 
     # TODO: When adding support for more calculators, come here and tweak it
-    input_params, pseudos, kpts, command = get_calculator_parameters()
+    input_params, pseudos, kpts, command = get_DFT_calculator_parameters()
     if command:
         calc = Espresso(input_data=input_params,
                         pseudopotentials=pseudos,
@@ -379,6 +394,58 @@ def set_calculator_parameters():
                         pseudopotentials=pseudos,
                         kpts=kpts)
     return calc
+
+
+def get_QM_forces(path=None):
+    """Calculates the DFT forces from the sampled geometries"""
+
+    # If no path given, works on current folder
+    cwd = os.getcwd()
+    if path:
+        os.chdir(path)
+
+    # Has to be the same as the generated in the MD
+    # Maybe create a parameter?
+    sampling_subfolder = "MD_sampled_geometries"
+    qm_forces_subfolder = "QM_forces"
+    os.makedirs(qm_forces_subfolder, exist_ok=True)
+
+    geometries = os.listdir(sampling_subfolder)
+
+    # Go through the extxyz files in folder --> Read in ase
+    for geom in geometries:
+        # work out the files and paths
+        qm_force_filename = geom.replace('.extxyz', '.pwo')
+        qm_force_filepath = os.path.join(qm_forces_subfolder, qm_force_filename)
+        qm_input_filename = geom.replace('.extxyz', '.pwi')
+
+        if os.path.exists(qm_force_filepath):
+            continue  # geometry already calculated
+
+        # Read the sampled geometry
+        sampled_filepath = os.path.join(sampling_subfolder, geom)
+        system = read(sampled_filepath)
+
+        calculator = set_DFT_calculator_parameters()
+        system.calc = calculator
+        system.calc.write_input(system)
+
+        os.rename('espresso.pwi', os.path.join(qm_forces_subfolder, qm_input_filename))
+
+        # Calculate the forces of each geometry
+        # TODO: Remove the if, and design a better workflow manipulation
+        if (config.calculate_f):
+            try:
+                system.get_forces()
+                logging.info(f'  Forces calculation finished: {qm_force_filepath}')
+                # Save as .pwo and QM_filename.extxyz
+                os.rename('espresso.pwo', qm_force_filepath)
+                extxyz_qm_file = qm_force_filepath.replace('pwo', 'extxyz')
+                write(system, extxyz_qm_file)
+            except:  # QE does not finish properly or optimization does not converge
+                logging.error(f' QEspresso in {qm_force_filepath} finished with error.')
+
+
 # -------------------------
 # Write files
 # -------------------------
