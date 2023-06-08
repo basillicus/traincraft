@@ -89,7 +89,7 @@ for structure in range(structures):
     # Generate rattled structures via MD using DFTB
     # TODO: Allow somehow control this parameteres too in input file
     # But it needs to be a good trade between usability and flexibilty
-    tk.run_MD(system, md_steps=5000, fmax=0.05)  # Fmax is used for preoptimization
+    tk.run_MD(system, md_steps=1000, fmax=0.05)  # Fmax is used for preoptimization
 
     # Go through all the generated extxyz files and calcute their DFT forces
     tk.get_QM_forces()
