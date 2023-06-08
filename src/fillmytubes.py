@@ -14,13 +14,16 @@ from config import config
 # v Generate M different geometries
 # ~ Add results to the database (Done in separate script so far) v Better geometries generation  --> Packmol
 # v Generate sampling geometries --> From Tight Bidning MD
-# o Compare similarity between generated structures?
+# o ALLOW FOR FLEXIBLE WORKFLOW:
+#   - Sometimes you want generate geometries
+#   - sometimes you want to go through the generated geometries and do sth
 # o Analyse results
 # o Add more calculators
+# o Compare similarity between generated structures? Not at the moment...
 
 """
-Creates CNT randomly filled with small molecules and calculates their energies
-and/or forces for training ML potentials
+Creates CNT randomly filled with small molecules and calculates their DFT energies
+and forces, generating a dataset for training ML potentials.
 
 PARAMETERS (read from a config.toml file)
 ----------
@@ -43,7 +46,9 @@ OUTPUT:
 -------
     - Visualizes the system if requested in config file
     - a QE input file for each generated geometry
-    - After running the calculation:
+    - md.traj trajectries
+    - sampled geometries in .extxyz format
+    - After running the QM calculation:
         - QE output files
 
 """
@@ -75,9 +80,6 @@ for structure in range(structures):
     # Run the calculation
     # -----------------------
 
-    # EMT is just for testing pourposes, EMT breaks CO2 molecules
-    # system.calc = EMT()
-
     calc = tk.set_DFT_calculator_parameters()
     # system.set_calculator(calc_QE)  # Deprecated
     system.calc = calc
@@ -85,10 +87,9 @@ for structure in range(structures):
     system.calc.write_input(system)
 
     # Generate rattled structures via MD using DFTB
-    # FIXME: This parameteres are for testing. Remove before uploading public version
-    # TODO: Allow somehow control this parameteres too.
-    # But needs to be a good trade between usability and flexibilty
-    tk.run_MD(system, md_steps=100, preoptimize=False, preopt_maxsteps=3)
+    # TODO: Allow somehow control this parameteres too in input file
+    # But it needs to be a good trade between usability and flexibilty
+    tk.run_MD(system, md_steps=5000, fmax=0.05)  # Fmax is used for preoptimization
 
     # Go through all the generated extxyz files and calcute their DFT forces
     tk.get_QM_forces()

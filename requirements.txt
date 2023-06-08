@@ -8,5 +8,7 @@ tomlkit
 qe
 packmol
 mdanalysis
+tblite
+tblite-python
 # torchani
 

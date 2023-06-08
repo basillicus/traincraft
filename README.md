@@ -1,9 +1,13 @@
-`Fillmytubes`  generates randomly filled carbon nanotubes with small molecules, calculates the energies and forces of each geometry. 
+`Fillmytubes`  automatizes the process of generating Datasets for training Machine Learning potentials. It generates randomly filled carbon nanotubes with small molecules, generates a set of geometries sampled from a MD (run with DFTTB via tblite) and calculates the DFT energies and forces of each sampled geometry
+
+Few simples scripts are provided, to collect all the final geometries in an .extxyz file
+
 
 TODO: 
+ - At the moment it only generates filled nanotubes, but it should be easily extensible to other systems
  - Generate Machine Larned force fields for the required system 
  - Run molecular dynamics with the generated force fields
- - Calculate the Raman spectra from the MD using a ML methodology (to be developed in Viena)
+ - Calculate the Raman spectra from the MD using a ML methodology
 
 ---
 
@@ -17,9 +21,9 @@ Install the following packages via pip or conda
 4. Mdanalysis
 5. mdapackmol-fmt (installation via pip)
   It is a forked version of mdapackmol
-    pip install mdapackmol-fmt
+    `pip install mdapackmol-fmt`
 6. Packmol
-7. Torchani
+7. tblite and tblite-python
 
 ---
 
@@ -54,12 +58,11 @@ tolerance = 2.0  # Minimum distance between molecules when packing (for Packmol)
     compresion_factor = 1.0  # How close molecules will be inside the CNT
 
     # Axis order in which molecule rotations will be performed, the same axis can be given    # several times, so several rotations will be performed.
-    # Non mandatory. Default is ['x', 'y', 'z']
+    # Default is ['x', 'y', 'z']
     # rot_axis = ['y', 'x', 'z', 'y']
     rot_axis = ['x', 'z', 'y']
     
     # Rotations for each molecule (in degrees) 
-    # (Non mandatory)
     rot_x = 90
     rot_y = {'min' = -25.0, 'max' = 25.0}
     rot_z = {'min' = 0, 'max' = 360}
@@ -71,19 +74,19 @@ cnt_m = 0
 cnt_l = 2        # Repetition units of a single CNT
 cnt_bond = 1.42  # Bond lenght in the CNT
 cnt_gap = 4      # Distance betwen CNTs (Ang)
-constraints = 'all'  # all: fix all nantoube atoms | none: none are fix
+# constraints = 'all'  # all: fix all nantoube atoms | none: none are fix  
 
 # ---------------------------
 # Calculation parameters
 # ---------------------------
 [calculator]
-calculator = 'qe'  # Use Quantum Espresso to calculate enrgies/forces
-calculate_forces = false
+calculator = 'qe'         # Use Quantum Espresso to calculate enrgies/forces
+calculate_forces = false  # If true: DFT forces are calculated from MD sampled geometries
 
   # Set the calculator parameters
   [calculator.qe]
-    # calculation = 'scf'  # Commented calculation
-    calculation = 'relax'  # QE kind of calculation: scf|relax|vc-relax
+    calculation = 'scf'    # QE kind of calculation: scf|relax|vc-relax
+    # calculation = 'relax'  # Commented calculation    
     # ecutwfc = 30         # commented plane-wave wave-function cutoff
     ecutwfc = 45           # plane-wave wave-function cutoff
     ecutrho = 180          # density wave-function cutoff,
@@ -91,7 +94,7 @@ calculate_forces = false
     forc_conv_thr = 1e-3   # Force convergence threshold
     etot_conv_thr = 1e-5   # Total energy convergence threshold
     nstep = 100            # Total ionic steps
-    pseudo_dir = "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/"
+    pseudo_dir = "/home/user/pseudos/qe/SSSP_1.1.2_PBE_precision/"
     vdw_corr = "xdm"       # Dispersion interactions
     occupations = "smearing"   # Add smearing
     smearing = "cold"      # smearing kind
@@ -121,7 +124,7 @@ random_seed = true
 # seed = 42  # If random_seed is false, use this seed instead
 
 # Paths and files
-folder_prefix = 'cnt'
+folder_prefix = 'dataset'
 logfile = 'logfile.log'
 # outdir = './'
 

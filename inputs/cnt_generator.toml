@@ -1,55 +1,55 @@
 # Work input file in TOML format
-title = 'Input file example. Use as a reference'
+title = 'Input file example for reference'
 
 # ----------------------------
 # Building geometry parameters
 # ----------------------------
+
+# geom_generation = 'manual'   # Manual generation of the geoometry.
+                               # If not given, Packmol will be used
 [structures]
-n_structures = 10  # Total number of random geoemtries to be generated
+n_structures = 5  # Total number of initial random geometries to be generated
 
 [molecules]
 molecule = 'CO2'
-n_molecules = 6
+n_molecules = 3
 compresion_factor = 1.0  # How close molecules will be inside the CNT
+tolerance = 2   # Minimum intermolecular distance for Packmol to distribute the molecules
 
-# TODO: Add posibility for totally random rotation?
-#
-# Axis order in which rotations will be performed, the same axis can be given
-# several times, so several rotations will be performd
-# Non mandatory. Default is ['x', 'y', 'z']
-# rot_axis = ['y', 'x', 'z', 'y']
-rot_axis = ['x', 'z', 'y']
+# If geom_generation = 'manual'
+    # Axis order in which rotations will be performed, the same axis can be given
+    # several times, so several rotations will be performd
+    # Default is ['x', 'y', 'z']
+    # rot_axis = ['y', 'x', 'z', 'y']
+    rot_axis = ['x', 'z', 'y']
 
-# Rotations for each molecule (in degrees) 
-# (Non mandatory)
-rot_x = 90
-rot_y = {'min' = -25.0, 'max' = 25.0}
-rot_z = {'min' = 0, 'max' = 360}
+    # Rotations for each molecule (in degrees) 
+    rot_x = 90
+    rot_y = {'min' = -25.0, 'max' = 25.0}
+    rot_z = {'min' = 0, 'max' = 360}
 
 [cnt]
 # n,m nanotube vectors
-cnt_n = 8
-cnt_m = 0
-cnt_l = 2    # Repetition units of a single CNT
-cnt_bond = 1.42  # Bond lenght in the CNT
-cnt_gap = 4  # Distance betwen CNTs (Ang)
-constraints = 'all'
+cnt_n    = 8
+cnt_m    = 0
+cnt_l    = 2         # Repetition units of a single CNT
+cnt_bond = 1.45      # Bond lenght in the CNT
+cnt_gap  = 4         # Distance betwen CNTs (Ang)
+# constraints = 'all'  # Not used 
 
 # ---------------------------
 # Calculation parameters
 # ---------------------------
 [calculator]
-calculator = 'qe'  # Use Quantum Espresso to calculate enrgies/forces
-calculate_energies = false
-calculate_forces = false
+calculator = 'qe'          # Use Quantum Espresso to calculate enrgies/forces
+calculate_forces = false   # If true: DFT forces will be calculated from MD sampled geometries
 
   # Set the calculator parameters
   [calculator.qe]
-    # calculation = 'scf'
-    calculation = 'relax'
-    # ecutwfc = 30         # plane-wave wave-function cutoff
-    ecutwfc = 45          # plane-wave wave-function cutoff
-    ecutrho = 180         # density wave-function cutoff,
+    calculation = 'scf'
+    # ecutwfc = 30        # plane-wave wave-function cutoff
+    ecutwfc = 50          # plane-wave wave-function cutoff
+    ecutrho = 600         # density wave-function cutoff
     conv_thr = 1e-8       # DFT self-consistency convergence
     forc_conv_thr = 1e-3  # Force convergence threshold
     etot_conv_thr = 1e-5  # Total energy convergence threshold
@@ -72,7 +72,7 @@ calculate_forces = false
 # ---------------------------
 [visualize]
 # You wanna see the geometries?
-visualize = true
+visualize = false
 # repeat = [1,1,3]
 
 # ---------------------------
@@ -84,8 +84,8 @@ random_seed = true
 # seed = 42  # If random_seed is false, use this seed instead
 
 # Paths and files
-folder_prefix = 'cnt'
-logfile = 'logfile.log'
+folder_prefix = 'dataset'
+# logfile = 'logfile.log'
 # outdir = './'
 
 # Parallelization (Experimental!)
