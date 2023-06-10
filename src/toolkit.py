@@ -361,7 +361,7 @@ def run_MD(system, method='tblite', fmax=0.001, sampling_interval=20,
     dyn.attach(traj.write, interval=sampling_interval)
     dyn.attach(sample_geometry, interval=sampling_interval)
 
-    logging.info(f'MD with {calculator} started:')
+    logging.info(f'MD with {method} started:')
     logging.info(f'  T = {temperature}; MD steps = {md_steps}; sampling every {sampling_interval} steps')
     dyn.run(md_steps)
     sampled_structures = floor(md_steps/sampling_interval)
