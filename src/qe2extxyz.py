@@ -3,8 +3,8 @@ import os
 from ase.io import read, write
 
 """
-Searchs for .pwo or else for .extxyz files and gathers the geometries with theirforces in one file geoemtry-forces.extxyz
-
+Searchs for .pwo or else for .extxyz files and gathers the
+geometries with their forces in one file geoemtry-forces.extxyz
 """
 
 if len(sys.argv) < 2:

@@ -19,6 +19,9 @@ from ase.visualize import view
 from ase.io import write
 from ase.io import read
 
+# Module:
+# ------
+#   M: utils
 def set_seed():
     """Duh!"""
     if config.random_seed:
@@ -30,6 +33,7 @@ def set_seed():
     logging.info(f'seed: {seed}')
 
 
+#   M: utils
 def get_xy_distance(a, b):
     """
     Calculates the distance between 2 vectors in their projections on
@@ -37,18 +41,81 @@ def get_xy_distance(a, b):
     """
     return np.linalg.norm(a[0:2] - b[0:2])
 
+# -------------------------
+# Write files
+# -------------------------
+
+# write('system.in', system, format='espresso-in',
+#       pseudopotentials={'C': '', 'O': ''})
+# traj_file = 'geopt.traj'
+
+# File manipulation stuff
+#   M: utils
+def get_parameter_from_pdb(pdb_file, pattern=None):
+    with open(pdb_file, 'r') as file:
+        for line in file:
+            if pattern in line:
+                return line
+
+#   M: utils
+def insert_line_in_pdb(pdb_file, new_line, insert_index):
+    # Read the contents of the PDB file
+    with open(pdb_file, 'r') as file:
+        lines = file.readlines()
+
+    # Insert the new line at the desired index
+    lines.insert(insert_index, new_line + '\n')
+
+    # Write the modified lines back to the PDB file
+    with open(pdb_file, 'w') as file:
+        file.writelines(lines)
+
+# -------------------------
+# Path tools
+# -------------------------
+#   M: utils
+def set_calculation_folder():
+    import uuid
+    # TODO: Change items according to if it is a crystal, surface, cnt...
+    items = (str(config.prefix),
+             str(config.cnt_n) + '-' + str(config.cnt_m),
+             'len-' + str(config.cnt_l),
+             str(config.n_molecules) + str(config.molec),
+             )
+    d = '_'.join(items)
+    p = config.outdir / d
+    p.mkdir(exist_ok=True)
+    calcdir = p / str(uuid.uuid4()).split('-')[4]
+
+    try:
+        calcdir.mkdir(exist_ok=False)
+    except FileExistsError:
+        # Really??! o.O Well, try again...
+        set_calculation_folder()
+
+    logging.info(f'folder created: {calcdir}')
+
+    return calcdir
+
+
+# Module:
+# ------
+#   GenGeom
+#   M: gengeom
 def generate_geometry():
 
-    if config.geom_generation == 'manual':
+    mode = config.geom_generation
+    if mode == 'manual':
         cnt = create_nanotube()
         molecules = add_molecules(cnt)
         system = cnt + molecules
-    else:
+    elif mode == 'auto':
         system = generate_geometry_with_packmol()
 
     return system
 
 
+#   M: gengeom
 def generate_geometry_with_packmol():
     """
     Generate geometry using PACKMOL via mdapackmol and MDAnalysis to
@@ -135,6 +202,7 @@ def generate_geometry_with_packmol():
     return system
 
 
+#   M: gengeom
 def create_nanotube():
     """Clue: Creates a ...
 
@@ -183,6 +251,7 @@ def create_nanotube():
     return cnt
 
 
+#   M: gengeom
 # TODO:
 # Move manipulation functions out of this function so I can use it to manipulate
 # individual geometries so we can pass to PACKMOL molecules in the desired orientation.
@@ -256,12 +325,17 @@ def add_molecules(cnt):
     return molecules
 
 
+#   M: gengeom
 def set_cell(system):
-    """Set the cell parameter of the system according to the CNT dimensions
+    """Set the cell parameter of the system
 
     Parameters
     ----------
-    System: The CNT with the molecules
+    System: (ASE Atoms)
+
+    Returns
+    -------
+        Returns nothing. It modifies the system itself
     """
 
     cnt_gap = config.cnt_gap
@@ -281,46 +355,98 @@ def set_cell(system):
     # system.set_cell([cell_x, cell_y, cell_z])
 
 
-def get_DFT_calculator_parameters():
-    """ Get the calculator parameters from config object"""
+#   M: gengeom
+def gen_rattled_geometries(system, min_distance=1.3):
+    """Generate rattled geometries using HiPhive
 
-    input_params = config.input_params
-    pseudos = config.pseudos
-    if config.kpts is not None:
-        kpts = tuple(config.kpts)
-    else:
-        kpts = None
-    nproc = config.nproc
+    Parameters
+    ----------
+    System: (ASE Atoms)
 
-    if nproc is not None and (not isinstance(nproc, int) or nproc < 1):
-        print("Error: invalid value for nproc in config file.")
-        sys.exit(1)
-
-    command = None
-    if nproc is not None:
-        command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
-    return input_params, pseudos, kpts, command
-
-
-def run_MD(system, method='tblite', fmax=0.001, sampling_interval=20,
-           temperature=500, md_steps=1000, preoptimize=True, preopt_maxsteps=None):
+    Generates
+    ---------
+    Rattled geoemetries: .extxyz files
     """
-    Performs a Molecular Dynamic using as calculator:
-     - ani: torchani (ANAKIN-ME like Deep Learning potentials)
-     - xtb: DFTB (does not work on periodic systems)
-     - tblite: DFTB (works on periodic systems)
-    It can preoptimize the geometry before start the MD
-    """
+    # """
+    # Generate displaced structures using
+    # * Standard rattle, gaussian displacements
+    # * Monte Carlo rattle, gaussian displacements w penatly for short atomic dists
+    # * Phonon rattle, construct a rough guess of fc2 and populate phonon modes with
+    #   thermal energy corresponding to a temperature
+    #
+    # The hyper parameters for the different methods are chosen such that the
+    # magnitude of the displacements will be roughly the same
+    #
+    # This script may take a few minutes to run.
+    # """
 
     from ase.io import write
-    from ase import units
-    from ase.optimize import BFGS
-    from ase.io.trajectory import Trajectory
-    from ase.md.langevin import Langevin
+    # from hiphive import ClusterSpace, StructureContainer, ForceConstantPotential
+    # from trainstation import Optimizer
+    # from hiphive.utilities import prepare_structures
+    # from hiphive.structure_generation import generate_rattled_structures
+    from hiphive.structure_generation import (generate_rattled_structures,
+                                              generate_mc_rattled_structures,
+                                              generate_phonon_rattled_structures)
 
-    from math import floor
+    method = config.sampling_calculator
+    rattled_structures = config.rattle_structures
+    rattle_std = config.rattled_std
+    rattle_method = config.rattle_method
 
-    # Set calculators
+    calc = get_aproximate_calculator(method)
+
+    # supercell = prim.repeat(size)
+    reference_positions = system.get_positions()
+
+    # write('reference_structure.xyz', supercell)
+
+    # standard rattle
+    if rattle_method == 'standard':
+        logging.info(f'Rattling: {rattle_method}; Rattled structures: {rattled_structures}; Rattle std: {rattle_std}')
+        for i in range(rattled_structures):
+            seed = np.random.randint(2**32-2)
+            structure_rattle = generate_rattled_structures(system, 1, rattle_std, seed=seed)
+            # TODO: Work out the folder storage/retrieval
+            write('structures_rattle_' + str(i) + '.extxyz', structure_rattle)
+
+    # Monte Carlo rattle
+    if rattle_method == 'mc':
+        logging.info(f'Rattling: {rattle_method}; Rattled structures: {rattled_structures}; Rattle std: {0.25 * rattle_std}; Min distance: {min_distance}')
+        for i in range(rattled_structures):
+            seed = np.random.randint(2**32-2)
+            structures_mc_rattle = generate_mc_rattled_structures(
+                system, 1, 0.25*rattle_std, min_distance, n_iter=20, seed=seed)
+            # TODO: Work out the folder storage/retrieval
+            write(f'structures_mc_rattle_{i}.extxyz', structures_mc_rattle)
+
+    #   # Phonon rattle
+
+    #   # initial model
+    #   cs = ClusterSpace(supercell, [5.0])
+    #   sc = StructureContainer(cs)
+    #   rattled_structures = generate_rattled_structures(supercell, 1, 0.05)
+    #   rattled_structures = prepare_structures(rattled_structures, supercell, calc)
+
+    #   for structure in rattled_structures:
+    #       sc.add_structure(structure)
+    #   opt = Optimizer(sc.get_fit_data(), train_size=1.0)
+    #   opt.train()
+    #   fcp = ForceConstantPotential(cs, opt.parameters)
+
+    #   # generate phonon rattled structures
+    #   fc2 = fcp.get_force_constants(supercell).get_fc_array(order=2, format='ase')
+    #   structures_phonon_rattle = generate_phonon_rattled_structures(
+    #       supercell, fc2, n_structures, T)
+    #   write('structures_phonon_rattle_T{}.extxyz'.format(T), structures_phonon_rattle)  # noqa
+
+
+# Module:
+#   calculators
+
+#   M: calculators
+def get_aproximate_calculator(method='tblite'):
+    """Returns requested calculator"""
     if method == 'ani':
         import torchani
         calculator = torchani.models.ANI1ccx().ase()
@@ -332,19 +458,69 @@ def run_MD(system, method='tblite', fmax=0.001, sampling_interval=20,
         # calculator = TBLite(method="GFN1-xTB")
         calculator = TBLite(method="GFN2-xTB")
 
-    # system.pbc = np.array([False, False, False])
-    system.calc = calculator
+    return calculator
 
-    if preoptimize:
-        # Geometry minimization the structure:
-        logging.info(f'Preoptimising with {method}; F_max = {fmax}; max steps = {preopt_maxsteps}')
-        opt = BFGS(system, maxstep=preopt_maxsteps)
-        opt.run(fmax=fmax)
+
+def preotimize(system, method='tblite', optimizer='bfgs', fmax=0.5, max_steps=None):
+    """Performs a preoptimization of the system"""
+    logging.info(f'Preoptimising with {method}; F_max = {fmax}; max steps = {max_steps}')
+    optimize(system, method, optimizer, fmax, max_steps)
+
+
+def optimize(system, method='tblite', optimizer='bfgs', fmax=0.01, max_steps=1000):
+    """Performs an optimization of the system"""
+    from ase.optimize import BFGS
+
+    # system.pbc = np.array([False, False, False])
+    system.calc = get_aproximate_calculator(method)
+
+    # Geometry minimization of the system
+    logging.info(f'Optimising with {method}; F_max = {fmax}; max steps = {max_steps}')
+    if optimizer == 'bfgs':
+        opt = BFGS(system, maxstep=max_steps)
+    opt.run(fmax=fmax)
+
+
+#   M: calculators
+def sample_geometries(system, method='md'):
+    if config:
+        method = config.sampling_method
+
+    if method == 'md':
+        run_MD(system)
+    if method == 'rattle':
+        gen_rattled_geometries(system)
+
+def run_MD(system, method='tblite', sampling_interval=20,
+           temperature=500, md_steps=1000):
+    """
+    Performs a Molecular Dynamic using as calculator:
+     - ani: torchani (ANAKIN-ME like Deep Learning potentials)
+     - xtb: DFTB (does not work on periodic systems)
+     - tblite: DFTB (works on periodic systems)
+    It can preoptimize the geometry before start the MD
+    """
+
+    from ase.io import write
+    from ase import units
+    from ase.io.trajectory import Trajectory
+    from ase.md.langevin import Langevin
+
+    from math import floor
+
+    if config:
+        method = config.sampling_calculator
+        sampling_interval = config.sampling_interval
+        temperature = config.sampling_temperature
+        md_steps = config.sampling_md_steps
+
+    # system.pbc = np.array([False, False, False])
+    system.calc = get_aproximate_calculator(method)
 
     def sample_geometry(format='extxyz'):
         """Samples a geometry from the MD"""
         import uuid
-        calcfile = str(uuid.uuid4()).split('-')[0]
+        calcfile = str(uuid.uuid4()).split('-')[4]
 
         # Define the subfolder path to save the sampled geometries
         sampling_subfolder = "MD_sampled_geometries"
@@ -368,6 +544,29 @@ def run_MD(system, method='tblite', fmax=0.001, sampling_interval=20,
     logging.info(f'  MD finished. Saved in md.traj. Sampled {sampled_structures} strcutures')
 
 
+#   M: calculators
+def get_DFT_calculator_parameters():
+    """ Get the calculator parameters from config object"""
+
+    input_params = config.input_params
+    pseudos = config.pseudos
+    if config.kpts is not None:
+        kpts = tuple(config.kpts)
+    else:
+        kpts = None
+    nproc = config.nproc
+
+    if nproc is not None and (not isinstance(nproc, int) or nproc < 1):
+        print("Error: invalid value for nproc in config file.")
+        sys.exit(1)
+
+    command = None
+    if nproc is not None:
+        command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
+    return input_params, pseudos, kpts, command
+
+
+#   M: calculators
 def set_DFT_calculator_parameters():
     """ Set the calculator parameters from config object"""
 
@@ -386,8 +585,12 @@ def set_DFT_calculator_parameters():
     return calc
 
 
+#   M: calculators
 def get_QM_forces(path=None):
     """Calculates the DFT forces from the sampled geometries"""
+
+    # TODO: Most of the lines of this function are to handle paths and filenames
+    # Move to or use dirman module and leave here only the QM calculation part
 
     # If no path given, works on current folder
     cwd = os.getcwd()
@@ -402,7 +605,7 @@ def get_QM_forces(path=None):
 
     geometries = os.listdir(sampling_subfolder)
 
-    # Go through the extxyz files in folder --> Read in ase
+    # Go through the extxyz files in folder --> Read in ase format
     for geom in geometries:
         # work out the files and paths
         qm_force_filename = geom.replace('.extxyz', '.pwo')
@@ -410,7 +613,7 @@ def get_QM_forces(path=None):
         qm_input_filename = geom.replace('.extxyz', '.pwi')
 
         if os.path.exists(qm_force_filepath):
-            continue  # geometry already calculated
+            continue  # geometry has been already calculated
 
         # Read the sampled geometry
         sampled_filepath = os.path.join(sampling_subfolder, geom)
@@ -430,65 +633,15 @@ def get_QM_forces(path=None):
                 logging.info(f'  Forces calculation finished: {qm_force_filepath}')
                 # Save as .pwo and QM_filename.extxyz
                 os.rename('espresso.pwo', qm_force_filepath)
-                extxyz_qm_file = qm_force_filepath.replace('.pwo', '.extxyz')
                 # FIXME: It does not write the .extxyz file of the DFT
+                # extxyz_qm_file = qm_force_filepath.replace('.pwo', '.extxyz')
                 # write(system, extxyz_qm_file)
             except:  # QE does not finish properly or optimization does not converge
                 logging.error(f' QEspresso in {qm_force_filepath} finished with error.')
 
-
-# -------------------------
-# Write files
-# -------------------------
-
-# write('system.in', system, format='espresso-in',
-#       pseudopotentials={'C': '', 'O': ''})
-# traj_file = 'geopt.traj'
-
-# File manipulation stuff
-def get_parameter_from_pdb(pdb_file, pattern=None):
-    with open(pdb_file, 'r') as file:
-        for line in file:
-            if pattern in line:
-                return line
-
-def insert_line_in_pdb(pdb_file, new_line, insert_index):
-    # Read the contents of the PDB file
-    with open(pdb_file, 'r') as file:
-        lines = file.readlines()
-
-    # Insert the new line at the desired index
-    lines.insert(insert_index, new_line + '\n')
-
-    # Write the modified lines back to the PDB file
-    with open(pdb_file, 'w') as file:
-        file.writelines(lines)
-
-# -------------------------
-# Path tools
-# -------------------------
-def set_calculation_folder():
-    import uuid
-    items = (str(config.prefix),
-             str(config.cnt_n) + '-' + str(config.cnt_m),
-             'len-' + str(config.cnt_l),
-             str(config.n_molecules) + str(config.molec),
-             )
-    d = '_'.join(items)
-    p = config.outdir / d
-    p.mkdir(exist_ok=True)
-    calcdir = p / str(uuid.uuid4()).split('-')[0]
-
-    try:
-        calcdir.mkdir(exist_ok=False)
-    except FileExistsError:
-        # Really??! o.O Well, try again...
-        set_calculation_folder()
-
-    logging.info(f'folder created: {calcdir}')
-
-    return calcdir
-
+# Module:
+#   visualize
+#   M: visualize
 def visualize(system):
     """Uses ASE GUI to visualize the system"""
     if config.visualize:

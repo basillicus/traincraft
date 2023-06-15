@@ -1,3 +1,4 @@
+"""Basic ASE db creation"""
 from ase.db import connect
 from ase.io import read
 # from glob import glob

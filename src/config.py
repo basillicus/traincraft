@@ -2,6 +2,13 @@ import sys
 import logging
 from params import Config
 
+"""Initializes the program
+
+Generates the config object and set up loggin system"""
+
+# KKK
+print("CONFIG IS BEING CALLED!")
+
 configfile = 'cnt_generator.toml'
 if len(sys.argv) > 1:
     configfile = sys.argv[1]

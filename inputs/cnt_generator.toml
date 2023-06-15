@@ -5,28 +5,29 @@ title = 'Input file example for reference'
 # Building geometry parameters
 # ----------------------------
 
-# geom_generation = 'manual'   # Manual generation of the geoometry.
-                               # If not given, Packmol will be used
+# geom_generation = 'manual'   # 'manual': Manual geometry generation
+                               # 'auto'  : Packmol will be used
+
 [structures]
 n_structures = 5  # Total number of initial random geometries to be generated
 
 [molecules]
 molecule = 'CO2'
 n_molecules = 3
-compresion_factor = 1.0  # How close molecules will be inside the CNT
 tolerance = 2   # Minimum intermolecular distance for Packmol to distribute the molecules
 
-# If geom_generation = 'manual'
-    # Axis order in which rotations will be performed, the same axis can be given
-    # several times, so several rotations will be performd
-    # Default is ['x', 'y', 'z']
-    # rot_axis = ['y', 'x', 'z', 'y']
-    rot_axis = ['x', 'z', 'y']
+# compresion_factor = 1.0  # How close molecules will be inside the CNT
 
-    # Rotations for each molecule (in degrees) 
-    rot_x = 90
-    rot_y = {'min' = -25.0, 'max' = 25.0}
-    rot_z = {'min' = 0, 'max' = 360}
+# Axis order in which rotations will be performed, the same axis can be given
+# several times, so several rotations will be performed
+# Default is ['x', 'y', 'z']
+# rot_axis = ['y', 'x', 'z', 'y']
+rot_axis = ['x', 'z', 'y']
+
+# Rotations for each molecule (in degrees)
+rot_x = 90
+rot_y = {'min' = -25.0, 'max' = 25.0}
+rot_z = {'min' = 0, 'max' = 360}
 
 [cnt]
 # n,m nanotube vectors
@@ -35,7 +36,22 @@ cnt_m    = 0
 cnt_l    = 2         # Repetition units of a single CNT
 cnt_bond = 1.45      # Bond lenght in the CNT
 cnt_gap  = 4         # Distance betwen CNTs (Ang)
-# constraints = 'all'  # Not used 
+# constraints = 'all'  # Not used
+
+[sampling]
+method = 'md'           #  How to sample geometries for DFT calculations
+                        #   'md' | 'rattle'
+calculator = 'tblite'   # Calculator to use for the sampling method
+
+[sampling.md]
+  sampling_interval = 20
+  temperature = 500
+  md_steps = 1000
+
+[sampling.rattle]
+  rattle_structures = 10   # how many rattle geoetries at each structure
+  rattle_std = 0.12
+
 
 # ---------------------------
 # Calculation parameters
@@ -66,6 +82,7 @@ calculate_forces = false   # If true: DFT forces will be calculated from MD samp
     [calculator.qe.pseudos]
       C = 'C.pbe-n-kjpaw_psl.1.0.0.UPF'
       O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
+
 
 # ---------------------------
 # Visualization parameters

@@ -3,13 +3,6 @@ import os
 import toolkit as tk
 from config import config
 
-# import logging
-
-# from ase.parallel import MPI
-
-# from gpaw import GPAW
-# from ase.calculators.emt import EMT
-
 # TODO:
 # v Generate M different geometries
 # ~ Add results to the database (Done in separate script so far) v Better geometries generation  --> Packmol
@@ -22,11 +15,12 @@ from config import config
 # o Compare similarity between generated structures? Not at the moment...
 
 """
-Creates CNT randomly filled with small molecules and calculates their DFT energies
-and forces, generating a dataset for training ML potentials.
+Creates CNT randomly filled with small molecules and calculates their
+DFT energies and forces, generating a dataset for training ML potentials.
 
-PARAMETERS (read from a config.toml file)
+Parameters
 ----------
+(read from a config.toml file)
     - molec: (str), ['CO2']|'H2O'|'N2'|....
     - n_molecules: (int), [4] number of molecules to fill the CNT with
     - compresion_factor: (float) controls how close/far the molecules will be
@@ -42,31 +36,33 @@ PARAMETERS (read from a config.toml file)
     - cnt_bond (float), [1.43] CNT C-C bond lenght
     - cnt_gap: (float), [4] Distance betwen neighbour CNTs (Ang)
 
-OUTPUT:
--------
+Output
+------
     - Visualizes the system if requested in config file
     - a QE input file for each generated geometry
-    - md.traj trajectries
+    - md.traj trajectories
     - sampled geometries in .extxyz format
     - After running the QM calculation:
         - QE output files
 
 """
-#
+
 # Order the chaos
 tk.set_seed()
 
+# TODO: Set a flexible (not lineal) WORKFLOW
+# # Workflow = ['preoptparams', 'gen_geom', 'preopt', 'sample_geometries', ...]
+# for work in config.workflow:
+#   call work(params)
 structures = config.n_structures
 for structure in range(structures):
-    # if rank == 0:
+    # Go to the required folder
     os.chdir(tk.set_calculation_folder())
 
     # -----------------------
     # Create the geometries
     # -----------------------
-
     system = tk.generate_geometry()
-
     # Add molecules and CNT together
     tk.set_cell(system)
 
@@ -76,22 +72,24 @@ for structure in range(structures):
     # This is the initial system, not the optimized
     tk.visualize(system)
 
-    # -----------------------
-    # Run the calculation
-    # -----------------------
-
+    # ------------------------
+    # Save initial Input Files
+    # ------------------------
     calc = tk.set_DFT_calculator_parameters()
-    # system.set_calculator(calc_QE)  # Deprecated
     system.calc = calc
     # Write input files, should you want to run calculations manually
     system.calc.write_input(system)
 
-    # Generate rattled structures via MD using DFTB
-    # TODO: Allow somehow control this parameteres too in input file
-    # But it needs to be a good trade between usability and flexibilty
-    tk.run_MD(system, md_steps=1000, fmax=0.05)  # Fmax is used for preoptimization
+    # -----------------------
+    # Run the calculation
+    # -----------------------
+    # tk.preotimize(system)
+
+    # Generate rattled structures via MD
+    # TODO> sampling fucntion
+    tk.sample_geometries(system)
 
     # Go through all the generated extxyz files and calcute their DFT forces
-    tk.get_QM_forces()
-
+    # tk.get_QM_forces()
+    # Go back and repeat
     os.chdir(config.cwd)
