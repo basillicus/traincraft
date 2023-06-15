@@ -83,13 +83,13 @@ for structure in range(structures):
     # -----------------------
     # Run the calculation
     # -----------------------
-    # tk.preotimize(system)
+    tk.preotimize(system)
 
     # Generate rattled structures via MD
-    # TODO> sampling fucntion
     tk.sample_geometries(system)
 
     # Go through all the generated extxyz files and calcute their DFT forces
-    # tk.get_QM_forces()
+    tk.get_QM_forces()
+
     # Go back and repeat
     os.chdir(config.cwd)
