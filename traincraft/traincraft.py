@@ -1,7 +1,12 @@
 import os
+import logging
 
-import toolkit as tk
 from config import config
+import toolkit as tk
+import calculeitors
+import utils
+import dirman
+# import gengeom
 
 # TODO:
 # v Generate M different geometries
@@ -10,6 +15,7 @@ from config import config
 # o ALLOW FOR FLEXIBLE WORKFLOW:
 #   - Sometimes you want generate geometries
 #   - sometimes you want to go through the generated geometries and do sth
+# o Add gneration of different systems: Molecules, molecs on surfaces, crystals, intercalated molecules...
 # o Analyse results
 # o Add more calculators
 # o Compare similarity between generated structures? Not at the moment...
@@ -46,10 +52,6 @@ Output
         - QE output files
 
 """
-
-# Order the chaos
-tk.set_seed()
-
 # TODO: Set a flexible (not lineal) WORKFLOW
 # # Workflow = ['preoptparams', 'gen_geom', 'preopt', 'sample_geometries', ...]
 # for work in config.workflow:
@@ -57,39 +59,53 @@ tk.set_seed()
 structures = config.n_structures
 for structure in range(structures):
     # Go to the required folder
-    os.chdir(tk.set_calculation_folder())
+    os.chdir(dirman.set_calculation_folder())
 
     # -----------------------
     # Create the geometries
     # -----------------------
-    system = tk.generate_geometry()
-    # Add molecules and CNT together
-    tk.set_cell(system)
+
+    system = None
+    if config.geom_generation:
+        system = tk.generate_geometry()
 
     # -----------------------
     # Visualize the system
     # -----------------------
     # This is the initial system, not the optimized
-    tk.visualize(system)
-
-    # ------------------------
-    # Save initial Input Files
-    # ------------------------
-    calc = tk.set_DFT_calculator_parameters()
-    system.calc = calc
-    # Write input files, should you want to run calculations manually
-    system.calc.write_input(system)
+    if config.visualize and system is not None:
+        tk.visualize(system)
 
     # -----------------------
-    # Run the calculation
+    # Run the preoptimization
     # -----------------------
-    tk.preotimize(system)
+    if config.do_preoptimize:
+        calculeitors.preotimize(system)
 
+    # -----------------------
+    # Sample geometries
+    # -----------------------
     # Generate rattled structures via MD
-    tk.sample_geometries(system)
+    if config.do_sampling:
+        tk.sample_geometries(system)
 
-    # Go through all the generated extxyz files and calcute their DFT forces
-    tk.get_QM_forces()
+    # -----------------------
+    # Run the QM calculations
+    # -----------------------
+    if config.calculator is not None:
+        # If the calculator has been set, write the input file
+        # Save initial Input Files
+        if config.calculator_writeInput and system is not None:
+            dirman.write_input_file(system)
+        if config.calculate_f:
+            # Go through all generated .extxyz files and calcute their DFT forces
+            if config.do_sampling:
+                if config.sampling_method == 'md':
+                    calculeitors.get_QM_forces(path='md')
+                if config.sampling_method == 'rattle':
+                    calculeitors.get_QM_forces(path='rattle')
+            else:
+                calculeitors.get_forces(system)
 
     # Go back and repeat
     os.chdir(config.cwd)

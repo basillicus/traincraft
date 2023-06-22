@@ -1,6 +1,6 @@
-`Fillmytubes`  automatizes the process of generating Datasets for training Machine Learning potentials. It generates randomly filled carbon nanotubes with small molecules, generates a set of geometries sampled from a MD (run with DFTTB via tblite) and calculates the DFT energies and forces of each sampled geometry
+`TrainCraft`  automatizes the process of generating Datasets for training Machine Learning potentials. At the moment it generates randomly filled carbon nanotubes with small molecules, it generates a set of geometries either sampled from a MD (run with DFTTB via tblite) or rattled using HiPhive and calculates the DFT energies and forces of each sampled geometry.
 
-Few simples scripts are provided, to collect all the final geometries in an .extxyz file
+Few simples scripts are also provided, to collect all the final geometries in an .extxyz file or to generate an ASE database.
 
 
 TODO: 
@@ -17,13 +17,24 @@ Install the following packages via pip or conda
 
 1. ASE
 2. tomlkit
-3. Quantum Espresso (qe)
+
+## Optional Packages (depending on your workflow)
+
+To calculate the DFT forces:
+3. qe (Quantum Espresso); Although consider using a compiled version in your machine for production calculations. It is way more efficient (but also painful)
+
+To generate geometries automatically
 4. Mdanalysis
 5. mdapackmol-fmt (installation via pip)
   It is a forked version of mdapackmol
     `pip install mdapackmol-fmt`
 6. Packmol
-7. tblite and tblite-python
+7. HiPhive (if rattle method is going to be used)
+
+
+To preoptimize geometries or run MD
+8.tblite and tblite-python
+9.torchani
 
 ---
 

@@ -1,12 +1,14 @@
-# Work input file in TOML format
+# Reference input file in TOML format
 title = 'Input file example for reference'
 
 # ----------------------------
 # Building geometry parameters
 # ----------------------------
+# Stared options(*) are the default one
 
-# geom_generation = 'manual'   # 'manual': Manual geometry generation
-                               # 'auto'  : Packmol will be used
+geom_generation = 'auto'       # 'manual'  : Manual geometry generation
+                               # 'auto'(*) : Packmol will be used
+                               # false     : Does not generate geometries
 
 [structures]
 n_structures = 5  # Total number of initial random geometries to be generated
@@ -20,7 +22,7 @@ tolerance = 2   # Minimum intermolecular distance for Packmol to distribute the 
 
 # Axis order in which rotations will be performed, the same axis can be given
 # several times, so several rotations will be performed
-# Default is ['x', 'y', 'z']
+# rot_axis = ['x', 'y', 'z'](*)
 # rot_axis = ['y', 'x', 'z', 'y']
 rot_axis = ['x', 'z', 'y']
 
@@ -38,39 +40,47 @@ cnt_bond = 1.45      # Bond lenght in the CNT
 cnt_gap  = 4         # Distance betwen CNTs (Ang)
 # constraints = 'all'  # Not used
 
+[preoptimize]
+fmax = 0.5             # Max force in atoms
+calculator = 'tblite'  # 'tblite'(*) | 'xtb' | 'ani'; Calculator to use for the optimization method
+max_steps = 1000
+
 [sampling]
-method = 'md'           #  How to sample geometries for DFT calculations
-                        #   'md' | 'rattle'
-calculator = 'tblite'   # Calculator to use for the sampling method
+method = 'md'           # 'md'(*) | 'rattle'; How to sample geometries
+calculator = 'tblite'   # 'tblite'(*) | 'xtb' | 'ani'; Calculator to use for the sampling method
 
-[sampling.md]
-  sampling_interval = 20
-  temperature = 500
-  md_steps = 1000
+  [sampling.md]
+    sampling_interval = 20
+    temperature = 500
+    md_steps = 1000
 
-[sampling.rattle]
-  rattle_structures = 10   # how many rattle geoetries at each structure
-  rattle_std = 0.12
+  [sampling.rattle]
+    rattle_structures = 10   # how many rattle geoetries at each structure
+    rattle_std = 0.12
 
+    [sampling.rattle.optimize]
+      fmax = 0.5             # Max force in atoms
+      max_steps = 20
 
 # ---------------------------
 # Calculation parameters
 # ---------------------------
+# Quantum Mechanical Calculator
 [calculator]
 calculator = 'qe'          # Use Quantum Espresso to calculate enrgies/forces
 calculate_forces = false   # If true: DFT forces will be calculated from MD sampled geometries
 
-  # Set the calculator parameters
+  # Set the QE calculator parameters
   [calculator.qe]
     calculation = 'scf'
-    # ecutwfc = 30        # plane-wave wave-function cutoff
+    # ecutwfc = 30        # Commented plane-wave wave-function cutoff
     ecutwfc = 50          # plane-wave wave-function cutoff
     ecutrho = 600         # density wave-function cutoff
     conv_thr = 1e-8       # DFT self-consistency convergence
     forc_conv_thr = 1e-3  # Force convergence threshold
     etot_conv_thr = 1e-5  # Total energy convergence threshold
     nstep = 100           # Total ionic steps
-    pseudo_dir = "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/"
+    pseudo_dir = "~/pseudos/qe/SSSP_1.1.2_PBE_precision/"
     vdw_corr = "xdm"
     occupations = "smearing"   # Add smearing
     smearing = "cold"  # smearing kind

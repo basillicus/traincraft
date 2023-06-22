@@ -4,7 +4,7 @@ from ase.io import read, write
 
 """
 Searchs for .pwo or else for .extxyz files and gathers the
-geometries with their forces in one file geoemtry-forces.extxyz
+geometries with their forces in one file geometry-forces.extxyz
 """
 
 if len(sys.argv) < 2:
@@ -27,6 +27,6 @@ with open(output_files) as f:
             infile = read(file[:-1])
             outfile = write('geometry-forces.extxyz', infile, append=True)
         except Exception as e:
-            print(f'Expetion {type(e).__name__}: Error reading/writing file: {file}')
+            print(f'Exception {type(e).__name__}: Error reading/writing file: {file}')
 
 os.remove(output_files)
