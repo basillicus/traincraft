@@ -101,9 +101,9 @@ for structure in range(structures):
             # Go through all generated .extxyz files and calcute their DFT forces
             if config.do_sampling:
                 if config.sampling_method == 'md':
-                    calculeitors.get_QM_forces(path='md')
+                    calculeitors.get_QM_forces(sampled_by='md')
                 if config.sampling_method == 'rattle':
-                    calculeitors.get_QM_forces(path='rattle')
+                    calculeitors.get_QM_forces(sampled_by='rattle')
             else:
                 calculeitors.get_forces(system)
 

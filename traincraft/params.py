@@ -223,8 +223,8 @@ class Config:
 
         if self.calculator == 'qe':
             default_input_params_qe = {
-                "ecutwfc": 45,     # plane-wave wave-function cutoff
-                "ecutrho": 180,    # density wave-function cutoff,
+                "ecutwfc": 50,     # plane-wave wave-function cutoff
+                "ecutrho": 400,    # density wave-function cutoff,
                 "conv_thr": 1e-6,  # DFT self-consistency convergence
                 "pseudo_dir": "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/",
                 "vdw_corr": "xdm",

@@ -1,4 +1,5 @@
 import logging
+import os
 
 import calculeitors
 from config import config
@@ -34,7 +35,8 @@ def set_calculation_folder():
              )
     d = '_'.join(items)
     p = config.outdir / d
-    p.mkdir(exist_ok=True)
+    os.makedirs(p, exist_ok=True)
+
     calcdir = p / str(uuid.uuid4()).split('-')[4]
 
     try:

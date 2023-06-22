@@ -156,7 +156,7 @@ def set_DFT_calculator_parameters():
 
 
 #   M: calculators
-def get_QM_forces(path=None):
+def get_QM_forces(path=None, sampled_by=None):
     """Calculates the DFT forces from the sampled geometries"""
 
     # TODO: Most of the lines of this function are to handle paths and filenames
@@ -171,9 +171,9 @@ def get_QM_forces(path=None):
 
     # Has to be the same as the generated in the MD
     # Maybe create a parameter?
-    if path == 'md':
+    if sampled_by == 'md':
         sampling_subfolder = "MD_sampled_geometries"
-    elif path == 'rattle':
+    elif sampled_by == 'rattle':
         sampling_subfolder = "rattle_sampled_geometries"
     qm_forces_subfolder = "QM_forces"
     os.makedirs(qm_forces_subfolder, exist_ok=True)
