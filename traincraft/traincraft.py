@@ -79,14 +79,14 @@ for structure in range(structures):
     # -----------------------
     # Run the preoptimization
     # -----------------------
-    if config.do_preoptimize:
+    if config.do_preoptimize and system is not None:
         calculeitors.preotimize(system)
 
     # -----------------------
     # Sample geometries
     # -----------------------
     # Generate rattled structures via MD
-    if config.do_sampling:
+    if config.do_sampling and system is not None:
         tk.sample_geometries(system)
 
     # -----------------------
@@ -98,14 +98,15 @@ for structure in range(structures):
         if config.calculator_writeInput and system is not None:
             dirman.write_input_file(system)
         if config.calculate_f:
-            # Go through all generated .extxyz files and calcute their DFT forces
             if config.do_sampling:
+                # Go through all generated .extxyz files and calcute their DFT forces
                 if config.sampling_method == 'md':
-                    calculeitors.get_QM_forces(sampled_by='md')
+                    calculeitors.get_QM_forces_from_sampled(sampled_by='md')
                 if config.sampling_method == 'rattle':
-                    calculeitors.get_QM_forces(sampled_by='rattle')
+                    calculeitors.get_QM_forces_from_sampled(sampled_by='rattle')
             else:
-                calculeitors.get_forces(system)
+                # If not sampled geometries, just get the forces of the generated geometry
+                calculeitors.get_QM_forces(system)
 
     # Go back and repeat
     os.chdir(config.cwd)

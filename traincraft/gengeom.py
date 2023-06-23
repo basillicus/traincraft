@@ -8,6 +8,7 @@ import logging
 import random
 import numpy as np
 
+from pathlib import Path
 
 from ase import Atoms
 # from ase.calculators.espresso import Espresso
@@ -241,19 +242,30 @@ def gen_rattled_geometries(system, min_distance=1.3):
             try:
                 structures_mc_rattle = generate_mc_rattled_structures(
                     system, 1, 0.25*rattle_std, min_distance, n_iter=20, seed=seed)
-                # TODO: Work out the folder storage/retrieval
                 write(f'structures_mc_rattle_{i}.extxyz', structures_mc_rattle)
             except Exception as e:
                 logging.warn(e)
                 pass
 
-    # TODO: Go through the generated rattled structures and preoptimize them if requested
+    rattle_goemetries = [f for f in os.listdir() if f.endswith('.extxyz')]
+
     if config.sampling_optimize_rattled:
         fmax = config.sampling_optimize_rattled_fmax
-        max_steps = config.sampling_optimize_rattlled_maxStep
-        logging.info(f"Optimizing rattled structure; Fmax: {fmax}; Max Steps: {max_steps} ")
-        calculeitors._optimize(system)
+        max_steps = config.sampling_optimize_rattled_maxStep
+        logging.info(f'Preoptimizing rattled geoemtries with Fmax: {fmax}; Max Steps: {max_steps}')
+        for geom in rattle_goemetries:
+            system = read(geom)
+            logging.info(f"  Optimizing rattled structure:{geom} ")
+            calculeitors._optimize(system, fmax=fmax, max_steps=max_steps)
+            write(geom, system)
 
+    # TODO: Try to get it from a centralize module: dirman
+    sampling_subfolder = "rattle_sampled_geometries"
+    p = Path(sampling_subfolder)
+    os.makedirs(p, exist_ok=True)
+    for f in rattle_goemetries:
+        os.rename(f, p/f)
+    #
     #   # Phonon rattle
 
     #   # initial model

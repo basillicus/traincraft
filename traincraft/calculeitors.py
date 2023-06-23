@@ -117,22 +117,26 @@ def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=
 def get_DFT_calculator_parameters():
     """ Get the calculator parameters from config object"""
 
-    input_params = config.input_params
-    pseudos = config.pseudos
-    if config.kpts is not None:
-        kpts = tuple(config.kpts)
-    else:
-        kpts = None
-    nproc = config.nproc
+    # TODO: When adding support for more calculators, come here and tweak it
+    if config.calculator == 'qe':
+        input_params = config.input_params
+        pseudos = config.pseudos
+        if config.kpts is not None:
+            kpts = tuple(config.kpts)
+        else:
+            kpts = None
+        nproc = config.nproc
 
-    if nproc is not None and (not isinstance(nproc, int) or nproc < 1):
-        print("Error: invalid value for nproc in config file.")
-        sys.exit(1)
+        if nproc is not None and (not isinstance(nproc, int) or nproc < 1):
+            print("Error: invalid value for nproc in config file.")
+            sys.exit(1)
 
-    command = None
-    if nproc is not None:
-        command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
-    return input_params, pseudos, kpts, command
+        command = None
+        if nproc is not None:
+            command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
+        return input_params, pseudos, kpts, command
+    if config.calculator == 'otherCalculators':
+        pass
 
 
 #   M: calculators
@@ -140,27 +144,27 @@ def set_DFT_calculator_parameters():
     """ Set the calculator parameters from config object"""
 
     # TODO: When adding support for more calculators, come here and tweak it
-    # if config.calculator == 'qe'
-    input_params, pseudos, kpts, command = get_DFT_calculator_parameters()
-    if command:
-        calc = Espresso(input_data=input_params,
-                        pseudopotentials=pseudos,
-                        kpts=kpts,
-                        command=command)
+    if config.calculator == 'qe':
+        input_params, pseudos, kpts, command = get_DFT_calculator_parameters()
+        if command:
+            calc = Espresso(input_data=input_params,
+                            pseudopotentials=pseudos,
+                            kpts=kpts,
+                            command=command)
 
-    else:
-        calc = Espresso(input_data=input_params,
-                        pseudopotentials=pseudos,
-                        kpts=kpts)
+        else:
+            calc = Espresso(input_data=input_params,
+                            pseudopotentials=pseudos,
+                            kpts=kpts)
+    if config.calculator == 'otherCalculators':
+        pass
+
     return calc
 
 
 #   M: calculators
-def get_QM_forces(path=None, sampled_by=None):
+def get_QM_forces_from_sampled(path=None, sampled_by=None):
     """Calculates the DFT forces from the sampled geometries"""
-
-    # TODO: Most of the lines of this function are to handle paths and filenames
-    # Move to or use dirman module and leave here only the QM calculation part
 
     # If no path given, works on current folder
     cwd = os.getcwd()
@@ -175,6 +179,7 @@ def get_QM_forces(path=None, sampled_by=None):
         sampling_subfolder = "MD_sampled_geometries"
     elif sampled_by == 'rattle':
         sampling_subfolder = "rattle_sampled_geometries"
+
     qm_forces_subfolder = "QM_forces"
     os.makedirs(qm_forces_subfolder, exist_ok=True)
 
@@ -194,6 +199,8 @@ def get_QM_forces(path=None, sampled_by=None):
         sampled_filepath = os.path.join(sampling_subfolder, geom)
         system = read(sampled_filepath)
 
+        # From this, once we have system we could call get_QM_forces(system)
+        # but the logging and file handling may require some care
         calculator = set_DFT_calculator_parameters()
         system.calc = calculator
         system.calc.write_input(system)
@@ -212,7 +219,14 @@ def get_QM_forces(path=None, sampled_by=None):
         except:  # QE does not finish properly or optimization does not converge
             logging.error(f' QEspresso in {qm_force_filepath} finished with error.')
 
-def get_forces(system):
+def get_QM_forces(system):
+    """Calculates the forces of the given system
+
+    Parameters
+    ----------
+    system: (ASE Atoms)
+    """
+    cwd = os.getcwd()
     calculator = set_DFT_calculator_parameters()
     system.calc = calculator
     # it may happen that it writes it twice
@@ -228,4 +242,4 @@ def get_forces(system):
         # extxyz_qm_file = qm_force_filepath.replace('.pwo', '.extxyz')
         # write(system, extxyz_qm_file)
     except:  # QE does not finish properly or optimization does not converge
-        logging.error(f' QEspresso in {qm_force_filepath} finished with error.')
+        logging.error(f' QEspresso in {cwd} finished with error.')
