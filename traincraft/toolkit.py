@@ -26,7 +26,8 @@ from ase.visualize import view
 # import TrainCraft modules
 from config import config
 import gengeom
-import calculeitors
+# import calculeitors
+import samplers
 
 
 #   M: gengeom
@@ -50,9 +51,9 @@ def sample_geometries(system, method='md'):
         method = config.sampling_method
 
     if method == 'md':
-        calculeitors.sampling_from_MD(system)
+        samplers.sampling_from_MD(system)
     if method == 'rattle':
-        gengeom.gen_rattled_geometries(system)
+        samplers.gen_rattled_geometries(system)
 
 
 def visualize(system):

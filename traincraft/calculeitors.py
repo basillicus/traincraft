@@ -60,59 +60,6 @@ def _optimize(system, method='tblite', fmax=0.01, max_steps=None, optimizer='bfg
     opt.run(fmax=fmax)
 
 
-def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=500, md_steps=1000):
-    """
-    Performs a Molecular Dynamic using as calculator:
-     - ani: torchani (ANAKIN-ME like Deep Learning potentials)
-     - xtb: DFTB (does not work on periodic systems)
-     - tblite: DFTB (works on periodic systems)
-    It can preoptimize the geometry before start the MD
-    """
-
-    from ase import units
-    from ase.io.trajectory import Trajectory
-    from ase.md.langevin import Langevin
-
-    from math import floor
-
-    if config:
-        method = config.sampling_calculator
-        sampling_interval = config.sampling_md_interval
-        temperature = config.sampling_md_temperature
-        md_steps = config.sampling_md_steps
-
-    # system.pbc = np.array([False, False, False])
-    system.calc = get_aproximate_calculator(method)
-
-    def sample_geometry(format='extxyz'):
-        """Samples a geometry from the MD"""
-        # M: to dirman
-        import uuid
-        calcfile = str(uuid.uuid4()).split('-')[4]
-
-        # Define the subfolder path to save the sampled geometries
-        sampling_subfolder = "MD_sampled_geometries"
-        os.makedirs(sampling_subfolder, exist_ok=True)
-
-        # Save the sampled geometry in the subfolder
-        filepath = os.path.join(sampling_subfolder, calcfile + '.' + format)
-        write(filepath, system)
-        # write('trajectory.extxyz', system, append=True)
-
-    # M: to calculeitors?
-    dyn = Langevin(system, 1 * units.fs, temperature * units.kB, 0.2)
-
-    traj = Trajectory('md.traj', 'w', system)
-    dyn.attach(traj.write, interval=sampling_interval)
-    dyn.attach(sample_geometry, interval=sampling_interval)
-
-    logging.info(f'MD with {method} started:')
-    logging.info(f'  T = {temperature}; MD steps = {md_steps}; sampling every {sampling_interval} steps')
-    dyn.run(md_steps)
-    sampled_structures = floor(md_steps/sampling_interval)
-    logging.info(f'  MD finished. Saved in md.traj. Sampled {sampled_structures} strcutures')
-
-
 #   M: calculators
 def get_DFT_calculator_parameters():
     """ Get the calculator parameters from config object"""

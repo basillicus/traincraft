@@ -51,6 +51,9 @@ class Config:
         self.title = self.config.get('title', 'untitled')
         print('Reading parameters for work:', self.title)
 
+        # TODO: Implement parameter optimizaztion
+        # self._read_DFT_parameters_optimization()
+
         print('  Reading geometry parameters...', end='')
         self._read_geometry_parameters()
         print('OK!')
@@ -75,15 +78,16 @@ class Config:
         ----------
         [structure]
 
-        geom_generation : '*auto*' | 'manual'
+        geom_generation : (str) or (bool) '*auto*' | 'manual' | False
             Determines how geometries will be generated
                 - manual: controls the displacement and rotation of the
                   molecules with the keywords `rot_axis`, `rot_x`, `rot_y`, `rot_z`, etc
                 - auto: will use Packmol to generate different geometries. Still
                   `rot_axis`, `rot_x`, `rot_y` and `rot_z`, can be used to provide Packmol
                   molecules with the desired orientation
+                - False: Do not generate geometries
 
-        n_structures : *1*
+        n_structures : int
             Number of different structures to be generated
 
         pbc : *True* | False | [False, False, True]
@@ -115,6 +119,10 @@ class Config:
         cnt_bond = [1.44]
         cnt_gap = [4.0]
         cnt_constraints = self.config['cnt'].get('constraints', 'all')
+
+        [crystal]
+        ...
+
         """
 
         # Options: 'manual' | 'auto'
@@ -125,7 +133,7 @@ class Config:
 
         # TODO: Implement this keywords.
         #   if type is molecule_on_surface, or molecular, or molecular_mix, or laminar
-        # Options: 'nanotube' | 'molecule' | ....
+        # Options: 'nanotube' | 'molecule' | 'crystal' | 'surface' | 'mol on surf' ...
         self.structure_type = self.config['structures'].get('type', 'nanotube')
         # TODO: Implement this keyword.
         #  Allow for parcial periodic boundary conditions, or just molecular systems
