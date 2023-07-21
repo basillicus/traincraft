@@ -49,5 +49,7 @@ Thumbs.db
 *.wmv
 
 # Local
-test/
-src/.pylintrc
+testing/
+tests/
+src/ 
+.pylintrc
