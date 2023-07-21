@@ -232,5 +232,6 @@ folder_prefix = 'dataset'
 
 ## Acknowledgment
 
-This project has received funding from the European Union’s Horizon 2020 research and innovation programme under the Marie Skłodowska-Curie grant agreement No 847635
+This project has received funding from the European Union’s Horizon 2020 research and innovation programme under the Marie Skłodowska-Curie grant agreement No 847635, uunder the project UNA Europa, an alliance of universities FOR the emergence of talent and the development of research CAREERs (UNA4CAREER)
+ 
 
