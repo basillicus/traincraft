@@ -51,5 +51,4 @@ Thumbs.db
 # Local
 testing/
 tests/
-src/ 
 .pylintrc

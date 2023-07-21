@@ -1,0 +1,83 @@
+# Work input file in TOML format
+# title = 'Input file example for reference'
+
+# ----------------------------
+# Building geometry parameters
+# ----------------------------
+
+# geom_generation = 'manual'   # 'manual': Manual geometry generation
+                               # 'auto'  : Packmol will be used
+
+[structures]
+n_structures = 1  # Total number of initial random geometries to be generated
+
+[molecules]
+molecule = 'CO2'
+# n_molecules = 1
+# tolerance = 2   # Minimum intermolecular distance for Packmol to distribute the molecules
+# rot_axis = ['x', 'z', 'y']
+# 
+# # Rotations for each molecule (in degrees)
+# rot_x = 90
+# rot_y = {'min' = -25.0, 'max' = 25.0}
+# rot_z = {'min' = 0, 'max' = 360}
+
+[cnt]
+cnt_m = 8
+cnt_n = 0
+cnt_l = 2
+
+# # ---------------------------
+# # Calculation parameters
+# # ---------------------------
+# [calculator]
+# calculator = 'qe'          # Use Quantum Espresso to calculate enrgies/forces
+# calculate_forces = false   # If true: DFT forces will be calculated from MD sampled geometries
+# 
+#   # Set the calculator parameters
+#   [calculator.qe]
+#     calculation = 'scf'
+#     # ecutwfc = 30        # plane-wave wave-function cutoff
+#     ecutwfc = 50          # plane-wave wave-function cutoff
+#     ecutrho = 600         # density wave-function cutoff
+#     conv_thr = 1e-8       # DFT self-consistency convergence
+#     forc_conv_thr = 1e-3  # Force convergence threshold
+#     etot_conv_thr = 1e-5  # Total energy convergence threshold
+#     nstep = 100           # Total ionic steps
+#     pseudo_dir = "/home/david/pseudos/qe/SSSP_1.1.2_PBE_precision/"
+#     vdw_corr = "xdm"
+#     occupations = "smearing"   # Add smearing
+#     smearing = "cold"  # smearing kind
+#     degauss = 0.02     # smearing amount
+#     tprnfor = true     # Print forces
+#     tstress = true     # Print stress tensor
+#     kpts = [1,1,2]
+# 
+#     [calculator.qe.pseudos]
+#       C = 'C.pbe-n-kjpaw_psl.1.0.0.UPF'
+#       O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
+# 
+# 
+# # ---------------------------
+# # Visualization parameters
+# # ---------------------------
+# [visualize]
+# You wanna see the geometries?
+# visualize = false
+# repeat = [1,1,3]
+
+# ---------------------------
+# General configuration stuff
+# ---------------------------
+# [config]
+# # Random things
+# random_seed = true
+# # seed = 42  # If random_seed is false, use this seed instead
+# 
+# # Paths and files
+# folder_prefix = 'dataset'
+# # logfile = 'logfile.log'
+# # outdir = './'
+# 
+# # Parallelization (Experimental!)
+# # nproc = 4   # Number of MPI processes to run qe as: mpiexec -np nproc ...
