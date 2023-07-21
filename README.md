@@ -29,8 +29,8 @@ To generate geometries automatically
 
 To preoptimize geometries or run MD
 
-8.tblite and tblite-python
-9.torchani
+8. tblite and tblite-python
+9. torchani
 
 ---
 
