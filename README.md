@@ -34,9 +34,72 @@ To preoptimize geometries or run MD
 
 ---
 
-## Input file
+## Minimum input file
 
-`TrainCraft` uses a single toml file as an input. As an example, use:
+This is an input file you can use to run TrainCraft. For this example you will need to have installed the required packages ASE and tomlkit, plus the optional packages Packmol, tblite, Mdanalysis, mdapackmol-fmt, HiPhive and Quantum Espresso. 
+
+```
+# Reference input file in TOML format
+title = 'Simple TrainCraft input file'
+
+# ----------------------------
+# Building geometry parameters
+# ----------------------------
+[structures]
+n_structures = 5  # Total number of initial random geometries to be generated
+
+[molecules]
+molecule = 'CO2'
+n_molecules = 3
+tolerance = 2   # Minimum intermolecular distance for Packmol to distribute the molecules
+
+[cnt]
+# n,m nanotube vectors
+cnt_n    = 8
+cnt_m    = 0
+cnt_l    = 2           # Repetition units of a single CNT
+
+[preoptimize]       # The existence of the Table, sets do_preoptimize to True
+fmax = 2                 # Max force in atoms
+
+[sampling]          # The existence of the Table, sets do_sampling to True
+method = 'rattle'        # 'md'(*) | 'rattle'; How to sample geometries
+calculator = 'tblite'    # 'tblite'(*) | 'xtb' | 'ani'; Calculator to use for the sampling method
+
+  [sampling.rattle]    # For more info, look at HiPhive doc: https://hiphive.materialsmodeling.org/advanced_topics/structure_generation.html
+    rattle_structures = 10   # how many rattle geometries at each structure
+
+# ---------------------------
+# Calculation parameters
+# ---------------------------
+[calculator]
+calculator = 'qe'          # Use Quantum Espresso as calculator to calculate  DFT energies/forces
+calculate_forces = true    # If true: DFT forces will be calculated
+write_input_file = true    # Writes the input file regardless forces being calculated
+
+  # Set the QE calculator parameters
+  [calculator.qe]
+    calculation = 'scf'
+    # ecutwfc = 30        # Commented plane-wave wave-function cutoff
+    ecutwfc = 50          # plane-wave wave-function cutoff
+    ecutrho = 600         # density wave-function cutoff
+    conv_thr = 1e-8       # DFT self-consistency convergence
+    forc_conv_thr = 1e-3  # Force convergence threshold
+    etot_conv_thr = 1e-5  # Total energy convergence threshold
+    nstep = 100           # Total ionic steps
+    pseudo_dir = "/home/user/pseudos/qe/SSSP_1.1.2_PBE_precision/"
+    vdw_corr = "xdm"      # use eXchange Dipole Moment method
+    occupations = "smearing"   # Add smearing
+    smearing = "cold"     # smearing kind
+    degauss = 0.02        # smearing amount
+    tprnfor = true        # Print forces
+    tstress = true        # Print stress tensor
+
+```
+
+## Full Reference input file
+
+`TrainCraft` uses a single toml file as an input. Below is the full reference of tables and keywords.
 
 ```
 # Reference input file in TOML format
@@ -47,8 +110,7 @@ title = 'Input file example for reference'
 # If [Table] ([preoptimize] | [sample] | [calculator]) is present it will perform the opearation. 
 # If not present, the operation will be skipped
 
-# ----------------------------
-# Building geometry parameters
+# ---------------------------- # Building geometry parameters
 # ----------------------------
 geom_generation = 'auto'       # 'manual'  : Manual geometry generation
                                # 'auto'(*) : Packmol will be used
@@ -167,3 +229,8 @@ folder_prefix = 'dataset'
 ## - if QE >= 7 do not use nproc, and QE will use all available processors
 # nproc = 4   # Number of MPI processes to run qe as: mpiexec -np nproc ...
 ```
+
+## Acknowledgment
+
+This project has received funding from the European Union’s Horizon 2020 research and innovation programme under the Marie Skłodowska-Curie grant agreement No 847635
+
