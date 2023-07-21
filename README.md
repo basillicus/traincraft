@@ -14,9 +14,11 @@ Install the following packages via pip or conda
 ## Optional Packages (depending on your workflow)
 
 To calculate the DFT forces:
+
 3. qe (Quantum Espresso); Although consider using a compiled version in your machine for production calculations. It is way more efficient (but also painful)
 
 To generate geometries automatically
+
 4. Mdanalysis
 5. mdapackmol-fmt (installation via pip)
   It is a forked version of mdapackmol
@@ -26,6 +28,7 @@ To generate geometries automatically
 
 
 To preoptimize geometries or run MD
+
 8.tblite and tblite-python
 9.torchani
 
