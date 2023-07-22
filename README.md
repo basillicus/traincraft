@@ -229,6 +229,10 @@ folder_prefix = 'dataset'
 ## - if QE >= 7 do not use nproc, and QE will use all available processors
 # nproc = 4   # Number of MPI processes to run qe as: mpiexec -np nproc ...
 ```
+## Citation
+
+A paper about TrainCraft has not yet been published, but if you find TrainCraft useful in your research, you can cite it using the Zenodo DOI: 10.5281/zenodo.8174842
+Also, remember to cite the packages you may be using via TrainCraft.
 
 ## Acknowledgment
 
