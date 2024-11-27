@@ -1,4 +1,4 @@
-`TrainCraft`  automatizes the process of generating Datasets for training Machine Learning potentials. At the moment it generates randomly filled carbon nanotubes with small molecules, it generates a set of geometries either sampled from a MD (run with DFTTB via tblite) or rattled using HiPhive and calculates the DFT energies and forces of each sampled geometry.
+`TrainCraft`  automates the process of generating Datasets for training Machine Learning potentials. At the moment it generates randomly filled carbon nanotubes with small molecules, it generates a set of geometries either sampled from a MD (run with DFTTB via tblite) or rattled using HiPhive and calculates the DFT energies and forces of each sampled geometry.
 
 Simple scripts are also provided to collect the final geometries in an .extxyz file or to generate an ASE database.
 
@@ -16,21 +16,23 @@ Install the following packages via pip or conda
 To calculate the DFT forces:
 
 3. qe (Quantum Espresso); Although consider using a compiled version in your machine for production calculations. It is way more efficient (but also painful)
+5. fhiaims: Requires a license. Accesible for academic use. 
+
 
 To generate geometries automatically
 
-4. Mdanalysis
-5. mdapackmol-fmt (installation via pip)
+5. Mdanalysis
+6. mdapackmol-fmt (installation via pip)
   It is a forked version of mdapackmol
     `pip install mdapackmol-fmt`
-6. Packmol
-7. HiPhive (if rattle method is going to be used)
+7. Packmol
+8. HiPhive (if rattle method is going to be used)
 
 
 To preoptimize geometries or run MD
 
-8. tblite and tblite-python
-9. torchani
+9. tblite and tblite-python
+10. torchani
 
 ---
 

@@ -21,7 +21,6 @@ from ase.build.attach import attach
 from ase.io import write
 from ase.io import read
 
-
 import calculeitors
 import utils
 
@@ -129,6 +128,7 @@ def generate_geometry_with_packmol():
 
     return system
 
+
 #   M: gengeom
 def create_nanotube():
     """Clue: Creates a ...
@@ -154,10 +154,12 @@ def create_nanotube():
         cnt.set_constraint(constraints)   # Lost afater PACKMOL
         # TODO: Get coordinates of atoms with constraints, and create a function
         # to apply the constraints again after Packmol
+        # IDEA (Fer): Save the indexes of the constrained atoms and apply them again after packmol
 
     # ------------------------
     # WORK OUT THE CONSTRAINTS
     # ------------------------
+    #
     # NOTE: Sorry for the mess below... A more flexible way of adding
     # constraints will be useful, but it may take some time before is
     # implemented. I keep this here for the future...
@@ -181,11 +183,9 @@ def create_nanotube():
 
 
 # M: gengeom
-# TODO:
-# Move manipulation functions out of this function so I can use it to manipulate
-# individual geometries so we can pass to PACKMOL molecules in the desired orientation.
-#   - My be useful when placing molecules outside the nanotube or on surfaces.
 def add_molecules(cnt):
+    # FIXME: At the moment this function is only called when gemetry is generated manually.
+    # It could also be called in the auto mode, so molecules can be rotated before passed to PACKMOL
     """ Add ONLY the molecules along the Z axis of the nanotube
     Does not add the nanotube itself
 
@@ -208,6 +208,10 @@ def add_molecules(cnt):
 
     rot_axis = config.molec_rot_axis
 
+# TODO:
+# Move manipulation functions out of this function so I can use it to manipulate
+# individual geometries so we can pass to PACKMOL molecules in the desired orientation.
+#   - My be useful when placing molecules outside the nanotube or on surfaces.
     def rotate_molecule(molecule, axis=['x', 'y', 'z']):
         for ax in axis:
             if ax == 'x':
