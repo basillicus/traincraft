@@ -1,3 +1,5 @@
+import sys
+
 from tomlkit import load
 from pathlib import Path
 
@@ -54,19 +56,19 @@ class Config:
         # TODO: Implement parameter optimizaztion
         # self._read_DFT_parameters_optimization()
 
-        print('  Reading geometry parameters...', end='')
+        print('  Reading geometry parameters... ', end='')
         self._read_geometry_parameters()
         print('OK!')
 
-        print('  Reading visualize parameters...', end='')
+        print('  Reading visualize parameters... ', end='')
         self._read_visualize_parameters()
         print('OK!')
 
-        print('  Reading calculator parameters...', end='')
+        print('  Reading calculator parameters... ', end='')
         self._read_calculator_parameters()
         print('OK!')
 
-        print('  Reading configuration parameters...', end='')
+        print('  Reading configuration parameters... ', end='')
         self._read_configuration_parameters()
         print('OK!')
 
@@ -150,10 +152,12 @@ class Config:
             # TODO:Allow molec to be a list, so different molecules
             # can be included in the same system
             # Allow to give a input file with a geometry
-            self.molec = self.config['molecules'].get('molecule', 'CO2')
-            # TODO: Raise exception if molecules is none
-            # if self.molec == None:
-            #     raise e
+            self.molec = self.config['molecules'].get('molecule', None)
+            if self.molec is None:
+                print("ERROR: key 'molecule' in table [molecules] not specified")
+                print("Some examples: H2O, CO, CO2, methane... you choose")
+                sys.exit(1)
+
             self.n_molecules = self.config['molecules'].get('n_molecules', 1)
             self.tolerance = self.config['molecules'].get('tolerance', 2.0)
 
