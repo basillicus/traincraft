@@ -46,13 +46,17 @@ cnt_gap  = 4         # Distance betwen CNTs (Ang)
 [preoptimize]       # The existence of the Table, sets do_preoptimize to True
 do_preoptimize = true  # Whether to perform preoptimization or not (Takes priority)
 fmax = 2               # Max force in atoms
-calculator = 'tblite'  # 'tblite'(*) | 'xtb' | 'ani'; Calculator to use for the optimization method
-max_steps = 100
+calculator = 'tblite'  # 'tblite'(*) | 'xtb' | 'mace-off23' | 'mace-mp0' | 'ani'; Calculator to use for the optimization method
+max_step = 0.2         # Biggest atom movement at every optimization step
+mace_model_path = '/path/to/the/model/MACE.model'    # Path if using a mace fine-tuned model 
+device = 'cpu'          # 'cpu'(*) | 'cuda';  Device to run on
 
 [sampling]        # The existence of the Table, sets do_sampling to True
 do_sampling = true      # Whether to perform sampling or not (Takes priority)
 method = 'md'           # 'md'(*) | 'rattle'; How to sample geometries
-calculator = 'tblite'   # 'tblite'(*) | 'xtb' | 'ani'; Calculator to use for the sampling method
+calculator = 'tblite'   # 'tblite'(*) | 'xtb' | 'mace-off23' | 'mace-mp0' | 'ani'; Calculator to use for the sampling method
+mace_model_path = '/path/to/model/MACE.model'   # Path if using a mace fine-tuned model 
+device = 'cpu'          # 'cpu'(*) | 'cuda'; Device to run on
 
   [sampling.md]
     sampling_interval = 20
@@ -66,15 +70,15 @@ calculator = 'tblite'   # 'tblite'(*) | 'xtb' | 'ani'; Calculator to use for the
 
     [sampling.rattle.optimize]   # Whether to preoptimize the rattled structures 
       fmax = 10                  # Max force in atoms
-      max_steps = 20
+      max_step = 0.1             # Biggest atom movement at every optimization step
 
 # ---------------------------
 # Calculation parameters
 # ---------------------------
 # Quantum Mechanical Calculator
 [calculator]
-calculator = 'qe'          # Use Quantum Espresso as calculator to calculate  DFT energies/forces
 calculate_forces = false   # If true: DFT forces will be calculated
+calculator = 'qe'          # 'qe'(*) | 'aims'  Use [Quantum Espresso | FHI-AIMS] as calculator for DFT energies/forces
 write_input_file = true    # Writes the input file regardless forces being calculated
 
   # Set the QE calculator parameters
@@ -100,6 +104,13 @@ write_input_file = true    # Writes the input file regardless forces being calcu
     [calculator.qe.pseudos]  # Not mandatory, but recomended
       C = 'C.pbe-n-kjpaw_psl.1.0.0.UPF'
       O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
+
+  # Set the FHI-AIMS calculator parameters
+  [calculator.aims]
+  # TODO:
+
+    [calculator.aims.outputs]  # Not mandatory, but recomended
+    # TODO:
 
 # ---------------------------
 # Visualization parameters

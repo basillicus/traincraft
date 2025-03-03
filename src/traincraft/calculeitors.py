@@ -5,17 +5,30 @@ import logging
 
 from ase.io import read
 from ase.io import write
-from ase.calculators.espresso import Espresso
+
+# This may give an error if Espresso is not installed
+#  \-> Move only to where is needed
+# from ase.calculators.espresso import Espresso
 
 from config import config
-import gengeom
+# import gengeom
 
 # Module:
 #   calculators
 
 #   M: calculators
-def get_aproximate_calculator(method='tblite'):
+def get_aproximate_calculator(method='tblite',
+                              # for MACE calculator
+                              device='cpu',
+                              mace_model=None,
+                              mace_dtype='float64'
+                              # for NEP calculator
+                              device='cpu',
+                              nep_model=None,
+                              nep_dtype='float64'
+                              ):
     """Returns requested calculator"""
+
     if method == 'ani':
         try:
             import torchani
@@ -31,6 +44,19 @@ def get_aproximate_calculator(method='tblite'):
         from tblite.ase import TBLite
         # calculator = TBLite(method="GFN1-xTB")
         calculator = TBLite(method="GFN2-xTB")
+    elif method == 'mace-off23':
+        from mace.calculators import mace_off as mace
+        if mace_model is None:
+            calculator = mace(model='large', device=device, default_dtype='float64')
+        else:
+            # ,'/home/david/ml/mace/mace-off23/20.fine_tunning/cpp6/pbe0/MACE.model')
+            calculator = mace(model=mace_model, device=device, default_dtype='float64')
+    elif method == 'mace-mp0':
+        from mace.calculators import mace_mp as mace
+        if mace_model is None:
+            calculator = mace(model='large', device=device, default_dtype='float64')
+        else:
+            calculator = mace(model=mace_model, device=device, default_dtype='float64')
 
     return calculator
 
@@ -46,7 +72,8 @@ def preotimize(system, method='tblite', fmax=0.5, max_steps=None, optimizer='bfg
     _optimize(system, method=method, fmax=fmax, max_steps=max_steps, optimizer=optimizer)
 
 
-def _optimize(system, method='tblite', fmax=0.01, max_steps=None, optimizer='bfgs', trajectory='optim.traj'):
+# def _optimize(system, method='tblite', fmax=0.01, max_steps=None, optimizer='bfgs', trajectory='optim.traj'):
+def _optimize(system, method='tblite', fmax=0.01, max_steps=0.1, optimizer='bfgs', trajectory='optim.traj'):
     """Performs an optimization of the system"""
     from ase.optimize import BFGS
 
@@ -92,6 +119,8 @@ def set_DFT_calculator_parameters():
 
     # TODO: When adding support for more calculators, come here and tweak it
     if config.calculator == 'qe':
+        from ase.calculators.espresso import Espresso
+
         input_params, pseudos, kpts, command = get_DFT_calculator_parameters()
         if command:
             calc = Espresso(input_data=input_params,

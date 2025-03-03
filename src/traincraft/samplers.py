@@ -10,12 +10,14 @@ import calculeitors
 from config import config
 
 
-def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=500, md_steps=1000):
+def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=500, timestep=1, md_steps=1000):
     """
     Performs a Molecular Dynamic using as calculator:
      - ani: torchani (ANAKIN-ME like Deep Learning potentials)
      - xtb: DFTB (does not work on periodic systems)
      - tblite: DFTB (works on periodic systems)
+     - mace-off23 (elements: H,C,N,O,F,P,S,Cl,Br,and I; molecular or periodic systems)
+     - mace-mp0 (elements 1-89, mainly for periodic systems)
     It can preoptimize the geometry before start the MD
     """
 
@@ -29,10 +31,24 @@ def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=
         method = config.sampling_calculator
         sampling_interval = config.sampling_md_interval
         temperature = config.sampling_md_temperature
+        timestep = config.sampling_md_timestep
         md_steps = config.sampling_md_steps
 
+        # # FIXME: It has to be a nicer way to handle mace_params than this
+        #
+        # mace_params = {'mace_model_path': None,
+        #                'device': None}
+        # if method.startswith('mace'):
+        #     mace_model_path = config.sampling_mace_model_path
+        #     device = config.sampling_device
+        #     mace_params = {'mace_model_path': mace_model_path,
+        #                    'device': device}
+
+        mace_params = {'mace_model_path': config.sampling_mace_model_path,
+                       'device': config.sampling_device} if method.startswith('mace') else {}
+
     # system.pbc = np.array([False, False, False])
-    system.calc = calculeitors.get_aproximate_calculator(method)
+    system.calc = calculeitors.get_aproximate_calculator(method, **(mace_params or {}))
 
     def sample_geometry(format='extxyz'):
         """Samples a geometry from the MD"""
@@ -50,14 +66,14 @@ def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=
         # write('trajectory.extxyz', system, append=True)
 
     # M: to calculeitors?
-    dyn = Langevin(system, 1 * units.fs, temperature * units.kB, 0.2)
+    dyn = Langevin(system, timestep * units.fs, temperature * units.kB, 0.2)
 
     traj = Trajectory('md.traj', 'w', system)
     dyn.attach(traj.write, interval=sampling_interval)
     dyn.attach(sample_geometry, interval=sampling_interval)
 
     logging.info(f'MD with {method} started:')
-    logging.info(f'  T = {temperature}; MD steps = {md_steps}; sampling every {sampling_interval} steps')
+    logging.info(f'  T = {temperature}; MD steps = {md_steps}; timestep  = {timestep} fs; sampling every {sampling_interval} steps')
     dyn.run(md_steps)
     sampled_structures = floor(md_steps/sampling_interval)
     logging.info(f'  MD finished. Saved in md.traj. Sampled {sampled_structures} strcutures')
@@ -102,7 +118,16 @@ def gen_rattled_geometries(system, min_distance=1.3):
     rattle_std = config.sampling_rattle_std
     rattle_method = config.sampling_rattle_method
 
-    calc = calculeitors.get_aproximate_calculator(method)
+    # FIXME: It has to be a nicer way to handle mace_params than this
+    mace_params = {'mace_model_path': None,
+                   'device': None}
+    if method.startswith('mace'):
+        mace_model_path = config.sampling_mace_model_path
+        device = config.sampling_device
+        mace_params = {'mace_model_path': mace_model_path,
+                       'device': device}
+
+    calc = calculeitors.get_aproximate_calculator(method, **mace_params)
 
     # supercell = prim.repeat(size)
     reference_positions = system.get_positions()

@@ -192,11 +192,14 @@ class Config:
             self.sampling_method = self.config['sampling'].get('method', 'md')
             # opts: tblite | xtb | ani
             self.sampling_calculator = self.config['sampling'].get('calculator', 'tblite')
+            self.sampling_device = self.config['sampling'].get('device', 'cpu')
+            self.sampling_mace_model_path = self.config['sampling'].get('mace_model_path', None)
 
             # sampling.md:
             if self.config['sampling'].get('md'):
                 self.sampling_md_interval = self.config['sampling']['md'].get('sampling_interval', 20)
                 self.sampling_md_temperature = self.config['sampling']['md'].get('temperature', 500)
+                self.sampling_md_timestep = self.config['sampling']['md'].get('timestep', 0.5)
                 self.sampling_md_steps = self.config['sampling']['md'].get('md_steps', 1000)
 
             # sampling.rattle
@@ -211,7 +214,7 @@ class Config:
                 if self.config['sampling']['rattle'].get('optimize'):
                     self.sampling_optimize_rattled = True
                     self.sampling_optimize_rattled_fmax = self.config['sampling']['rattle']['optimize'].get('fmax', 1.0)
-                    self.sampling_optimize_rattled_maxStep = self.config['sampling']['rattle']['optimize'].get('max_steps', 100)
+                    self.sampling_optimize_rattled_maxStep = self.config['sampling']['rattle']['optimize'].get('max_step', 0.1)
 
     def _read_visualize_parameters(self):
         # How sample geometries: 'md' | 'rattle'
@@ -272,10 +275,11 @@ class Config:
         self.do_preoptimize = False
         if self.config.get('preoptimize'):
             self.do_preoptimize = self.config['preoptimize'].get('do_preoptimize', True)
-            # opt: tblite | xtb | ani
+            # opt: tblite | xtb | mace-off23 | mace-mp0 | ani
             self.preopt_calculator = self.config['preoptimize'].get('calculator', 'tblite')
-            self.preopt_fmax = self.config['preoptimize'].get('fmax', 1.0)
-            self.preopt_maxSteps = self.config['preoptimize'].get('max_steps', 1000)
+            self.preopt_fmax = self.config['preoptimize'].get('fmax', 2.0)
+            self.preopt_maxSteps = self.config['preoptimize'].get('max_step', 0.25)
+            self.preopt_mace_model_path = self.config['preoptimize'].get('mace_model_path', None)
 
     def _read_configuration_parameters(self):
         """ Called by read_parameters().

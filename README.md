@@ -32,7 +32,59 @@ To generate geometries automatically
 To preoptimize geometries or run MD
 
 9. tblite and tblite-python
-10. torchani
+11. MACE (requires PyTorch to be installed)
+12. torchani
+
+## Installation process example (Linux)
+
+### Installation of conda/miniconda
+
+Download and [install miniconda](https://docs.anaconda.com/miniconda/install/#quick-command-line-install):
+
+    mkdir -p ~/miniconda3
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
+    bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+    rm ~/miniconda3/miniconda.sh
+
+After the installation is finished run: 
+
+    source ~/miniconda3/bin/activate
+
+Initialize conda: 
+
+    conda init --all
+
+Create and activate a new conda environment
+
+    conda create -n traincraft 
+    conda activate traincraft
+
+### Installation of the packages for traincraft
+
+Install the required packages, not all are mandatory, but are recomended. The only mandatory ones are ASE and Tomlkit, but then you are missing the main point of using traincraft. 
+
+    conda install -c conda-forge ase tomlkit packmol hiphive mdanalysis tblite tblite-python 
+
+Also need to install mdapackmol-fmt (this will be integrated inside Traincraft in the future, so you will be able to skip this step):
+
+    pip install mdapackmol-fmt
+
+If you want to use MACE, you will need to install pytorch. If you have a CUDA ready device, you can install pytorch with CUDA 12.2 (is a big installation, so it may take a while):
+
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+Once it finishes, you can install MACE as:
+
+    pip install mace-torch
+
+
+### Installation of DFT codes
+
+If you want to use Quantum Espresso as your ab-initio code, you can also install it via conda, although ideally would be better to have a fresh compilation on your computing machine:
+
+    conda install -c conda-forge qe
+
+Traincraft soon will be able to use [FHI-AIMS](https://fhi-aims.org/) for calculating energy/forces with DFT. There is no conda package, as it requires a license, altough it is free to use for accademic use, it has a voluntary fee to be paid to help running site, and other things.
 
 ---
 
