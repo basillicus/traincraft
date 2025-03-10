@@ -1,4 +1,5 @@
 """All stuff related to calculators and calculations"""
+
 import sys
 import os
 import logging
@@ -16,64 +17,104 @@ from config import config
 # Module:
 #   calculators
 
+
 #   M: calculators
-def get_aproximate_calculator(method='tblite',
-                              # for MACE calculator
-                              device='cpu',
-                              mace_model=None,
-                              mace_dtype='float64'
-                              # for NEP calculator
-                              device='cpu',
-                              nep_model=None,
-                              nep_dtype='float64'
-                              ):
+def get_aproximate_calculator(method="tblite", **params):
     """Returns requested calculator"""
 
-    if method == 'ani':
+    if method == "ani":
         try:
             import torchani
         except Exception as e:
             print(type(e))
-            print('ERROR: torchani is not installed. Bye for now!')
+            print("ERROR: torchani is not installed. Bye for now!")
             sys.exit(1)
         calculator = torchani.models.ANI1ccx().ase()
-    elif method == 'xtb':
+
+    elif method == "xtb":
         from xtb.ase.calculator import XTB
+
         calculator = XTB(method="GFN2-xTB")
-    elif method == 'tblite':
+
+    elif method == "tblite":
         from tblite.ase import TBLite
+
         # calculator = TBLite(method="GFN1-xTB")
         calculator = TBLite(method="GFN2-xTB")
-    elif method == 'mace-off23':
-        from mace.calculators import mace_off as mace
-        if mace_model is None:
-            calculator = mace(model='large', device=device, default_dtype='float64')
-        else:
-            # ,'/home/david/ml/mace/mace-off23/20.fine_tunning/cpp6/pbe0/MACE.model')
-            calculator = mace(model=mace_model, device=device, default_dtype='float64')
-    elif method == 'mace-mp0':
-        from mace.calculators import mace_mp as mace
-        if mace_model is None:
-            calculator = mace(model='large', device=device, default_dtype='float64')
-        else:
-            calculator = mace(model=mace_model, device=device, default_dtype='float64')
+
+    elif method.startswith("mace"):
+        calculator = _get_mace_calculator(method, **params)
+
+    elif method.startswith("nep"):
+        # TODO: Implement NEP potentials
+        # calculator = _get_nep_calculator(method, **params)
+        pass
 
     return calculator
 
 
-def preotimize(system, method='tblite', fmax=0.5, max_steps=None, optimizer='bfgs', trajectory='preopt.traj'):
+def _get_mace_calculator(
+    method, mace_model="large", device="cpu", default_dtype="float64"
+):
+    if method == "mace-off23":
+        from mace.calculators import mace_off as mace
+
+        if mace_model is None:
+            calculator = mace(model="large", device=device, default_dtype=default_dtype)
+        else:
+            calculator = mace(
+                model=mace_model, device=device, default_dtype=default_dtype
+            )
+
+    elif method == "mace-mp0":
+        from mace.calculators import mace_mp as mace
+
+        if mace_model is None:
+            calculator = mace(model="large", device=device, default_dtype=default_dtype)
+        else:
+            calculator = mace(
+                model=mace_model, device=device, default_dtype=default_dtype
+            )
+
+    else:
+        print("ERROR: Mace method ", method, "not implemented.")
+        print("Choices: mace-off23, mace-mp0")
+        sys.exit(1)
+
+    return calculator
+
+
+def preotimize(
+    system,
+    method="tblite",
+    fmax=0.5,
+    max_steps=None,
+    optimizer="bfgs",
+    trajectory="preopt.traj",
+):
     """Performs a preoptimization of the system"""
     if config:
         method = config.preopt_calculator
         fmax = config.preopt_fmax
         max_steps = config.preopt_maxSteps
 
-    logging.info(f'Preoptimising with {method}; F_max = {fmax}; max steps = {max_steps}')
-    _optimize(system, method=method, fmax=fmax, max_steps=max_steps, optimizer=optimizer)
+    logging.info(
+        f"Preoptimising with {method}; F_max = {fmax}; max steps = {max_steps}"
+    )
+    _optimize(
+        system, method=method, fmax=fmax, max_steps=max_steps, optimizer=optimizer
+    )
 
 
 # def _optimize(system, method='tblite', fmax=0.01, max_steps=None, optimizer='bfgs', trajectory='optim.traj'):
-def _optimize(system, method='tblite', fmax=0.01, max_steps=0.1, optimizer='bfgs', trajectory='optim.traj'):
+def _optimize(
+    system,
+    method="tblite",
+    fmax=0.01,
+    max_steps=0.1,
+    optimizer="bfgs",
+    trajectory="optim.traj",
+):
     """Performs an optimization of the system"""
     from ase.optimize import BFGS
 
@@ -81,7 +122,7 @@ def _optimize(system, method='tblite', fmax=0.01, max_steps=0.1, optimizer='bfgs
     system.calc = get_aproximate_calculator(method)
 
     # Geometry minimization of the system
-    if optimizer == 'bfgs':
+    if optimizer == "bfgs":
         # opt = BFGS(system, maxstep=max_steps)
         opt = BFGS(system, maxstep=max_steps, trajectory=trajectory)
     opt.run(fmax=fmax)
@@ -89,10 +130,10 @@ def _optimize(system, method='tblite', fmax=0.01, max_steps=0.1, optimizer='bfgs
 
 #   M: calculators
 def get_DFT_calculator_parameters():
-    """ Get the calculator parameters from config object"""
+    """Get the calculator parameters from config object"""
 
     # TODO: When adding support for more calculators, come here and tweak it
-    if config.calculator == 'qe':
+    if config.calculator == "qe":
         input_params = config.input_params
         pseudos = config.pseudos
         if config.kpts is not None:
@@ -109,30 +150,57 @@ def get_DFT_calculator_parameters():
         if nproc is not None:
             command = f"mpiexec -np {nproc} pw.x < espresso.pwi > espresso.pwo"
         return input_params, pseudos, kpts, command
-    if config.calculator == 'otherCalculators':
+
+    # TODO: Implement FHI-AIMS as DFT calculator
+    if config.calculator == "aims":
+        input_params = config.input_params
+        #     if config.kpts is not None:
+        #         kpts = tuple(config.kpts)
+        #     else:
+        #         kpts = None
+        #     nproc = config.nproc
+
+        #     if nproc is not None and (not isinstance(nproc, int) or nproc < 1):
+        #         print("Error: invalid value for nproc in config file.")
+        #         sys.exit(1)
+
+        #     command = None
+        #     if nproc is not None:
+        #         command = f"mpirun -np {nproc}  aims.x > espresso.pwo"
+        return input_params
+
+    if config.calculator == "otherCalculators":
         pass
 
 
 #   M: calculators
 def set_DFT_calculator_parameters():
-    """ Set the calculator parameters from config object"""
+    """Set the calculator parameters from config object"""
 
     # TODO: When adding support for more calculators, come here and tweak it
-    if config.calculator == 'qe':
+    if config.calculator == "qe":
         from ase.calculators.espresso import Espresso
 
         input_params, pseudos, kpts, command = get_DFT_calculator_parameters()
         if command:
-            calc = Espresso(input_data=input_params,
-                            pseudopotentials=pseudos,
-                            kpts=kpts,
-                            command=command)
+            calc = Espresso(
+                input_data=input_params,
+                pseudopotentials=pseudos,
+                kpts=kpts,
+                command=command,
+            )
 
         else:
-            calc = Espresso(input_data=input_params,
-                            pseudopotentials=pseudos,
-                            kpts=kpts)
-    if config.calculator == 'otherCalculators':
+            calc = Espresso(
+                input_data=input_params, pseudopotentials=pseudos, kpts=kpts
+            )
+    if config.calculator == "aims":
+        from ase.calculators.aims import Aims
+
+        input_parameters = get_DFT_calculator_parameters()
+        calc = Aims(**input_parameters)
+
+    if config.calculator == "otherCalculators":
         pass
 
     return calc
@@ -151,9 +219,9 @@ def get_QM_forces_from_sampled(path=None, sampled_by=None):
 
     # Has to be the same as the generated in the MD
     # Maybe create a parameter?
-    if sampled_by == 'md':
+    if sampled_by == "md":
         sampling_subfolder = "MD_sampled_geometries"
-    elif sampled_by == 'rattle':
+    elif sampled_by == "rattle":
         sampling_subfolder = "rattle_sampled_geometries"
 
     qm_forces_subfolder = "QM_forces"
@@ -164,11 +232,12 @@ def get_QM_forces_from_sampled(path=None, sampled_by=None):
     # Go through the extxyz files in folder --> Read in ase format
     for geom in geometries:
         # work out the files and paths
-        qm_force_filename = geom.replace('.extxyz', '.pwo')
+        qm_force_filename = geom.replace(".extxyz", ".out")
         qm_force_filepath = os.path.join(qm_forces_subfolder, qm_force_filename)
-        qm_input_filename = geom.replace('.extxyz', '.pwi')
+        qm_input_filename = geom.replace(".extxyz", ".in")
 
         if os.path.exists(qm_force_filepath):
+            # TODO: Check the calcualtion finished correctly
             continue  # geometry has been already calculated
 
         # Read the sampled geometry
@@ -181,19 +250,24 @@ def get_QM_forces_from_sampled(path=None, sampled_by=None):
         system.calc = calculator
         system.calc.write_input(system)
 
-        os.rename('espresso.pwi', os.path.join(qm_forces_subfolder, qm_input_filename))
+        # os.rename("espresso.pwi", os.path.join(qm_forces_subfolder, qm_input_filename))
 
         # Calculate the forces of each geometry
         try:
             system.get_forces()
-            logging.info(f'  Forces calculation finished: {qm_force_filepath}')
+            logging.info(f"  Forces calculation finished: {qm_force_filepath}")
             # Save as .pwo and QM_filename.extxyz
-            os.rename('espresso.pwo', qm_force_filepath)
+            # TODO: Handle properly if calculato is qe or aims
+            # Properly mv the right files and print out the right messages
+            # os.rename("espresso.pwo", qm_force_filepath)
+            # os.rename(os.path.join(sampling_subfolder, "aims.out"), qm_force_filepath)
+            os.rename("aims.out", qm_force_filepath)
             # FIXME: It does not write the .extxyz file of the DFT
             # extxyz_qm_file = qm_force_filepath.replace('.pwo', '.extxyz')
             # write(system, extxyz_qm_file)
         except:  # QE does not finish properly or optimization does not converge
-            logging.error(f' QEspresso in {qm_force_filepath} finished with error.')
+            logging.error(f" QEspresso in {qm_force_filepath} finished with error.")
+
 
 def get_QM_forces(system):
     """Calculates the forces of the given system
@@ -209,13 +283,13 @@ def get_QM_forces(system):
     system.calc.write_input(system)
     # Calculate the forces of each geometry
     try:
-        logging.info(f'  Calculation of  forces started with {config.calculator}')
+        logging.info(f"  Calculation of  forces started with {config.calculator}")
         system.get_forces()
-        logging.info('  Forces calculation finished')
+        logging.info("  Forces calculation finished")
         # Save as .pwo and QM_filename.extxyz
         # os.rename('espresso.pwo', qm_force_filepath)
         # FIXME: It does not write the .extxyz file of the DFT
         # extxyz_qm_file = qm_force_filepath.replace('.pwo', '.extxyz')
         # write(system, extxyz_qm_file)
     except:  # QE does not finish properly or optimization does not converge
-        logging.error(f' QEspresso in {cwd} finished with error.')
+        logging.error(f" QEspresso in {cwd} finished with error.")

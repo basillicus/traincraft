@@ -9,17 +9,15 @@ title = 'Input file example for reference'
 # ----------------------------
 # Building geometry parameters
 # ----------------------------
-geom_generation = 'auto'       # 'manual'  : Manual geometry generation
-                               # 'auto'(*) : Packmol will be used
-                               # false     : Does not generate geometries
+geom_generation = 'auto' # 'manual'  : Manual geometry generation | 'auto'(*) : Use Packmol | false : Does not generate geometries
 
 [structures]
-n_structures = 5  # Total number of initial random geometries to be generated
+n_structures = 5 # Total number of initial random geometries to be generated
 
 [molecules]
 molecule = 'CO2'
 n_molecules = 3
-tolerance = 2   # Minimum intermolecular distance for Packmol to distribute the molecules
+tolerance = 2    # Minimum intermolecular distance for Packmol to distribute the molecules
 
 # compresion_factor = 1.0  # How close molecules will be inside the CNT, when geom_generation = 'manual'
 
@@ -31,86 +29,95 @@ rot_axis = ['x', 'z', 'y']
 
 # Rotations for each molecule (in degrees)
 rot_x = 90
-rot_y = {'min' = -25.0, 'max' = 25.0}
-rot_z = {'min' = 0, 'max' = 360}
+rot_y = { 'min' = -25.0, 'max' = 25.0 }
+rot_z = { 'min' = 0, 'max' = 360 }
 
 [cnt]
 # n,m nanotube vectors
-cnt_n    = 8
-cnt_m    = 0
-cnt_l    = 2         # Repetition units of a single CNT
-cnt_bond = 1.45      # Bond lenght in the CNT
-cnt_gap  = 4         # Distance betwen CNTs (Ang)
+cnt_n = 8
+cnt_m = 0
+cnt_l = 2       # Repetition units of a single CNT
+cnt_bond = 1.45 # Bond lenght in the CNT
+cnt_gap = 4     # Distance betwen CNTs (Ang)
 # constraints = 'all'  # Not used
 
-[preoptimize]       # The existence of the Table, sets do_preoptimize to True
-do_preoptimize = true  # Whether to perform preoptimization or not (Takes priority)
-fmax = 2               # Max force in atoms
-calculator = 'tblite'  # 'tblite'(*) | 'xtb' | 'mace-off23' | 'mace-mp0' | 'ani'; Calculator to use for the optimization method
-max_step = 0.2         # Biggest atom movement at every optimization step
-mace_model_path = '/path/to/the/model/MACE.model'    # Path if using a mace fine-tuned model 
-device = 'cpu'          # 'cpu'(*) | 'cuda';  Device to run on
+[preoptimize] # The existence of the Table, sets do_preoptimize to True
+do_preoptimize = true                             # Whether to perform preoptimization or not (Takes priority)
+fmax = 2                                          # Max force in atoms
+calculator = 'tblite'                             # 'tblite'(*) | 'xtb' | 'mace-off23' | 'mace-mp0' | 'ani'; Calculator to use for the optimization method
+max_step = 0.2                                    # Biggest atom movement at every optimization step
+mace_model_path = '/path/to/the/model/MACE.model' # Path if using a mace fine-tuned model 
+device = 'cpu'                                    # 'cpu'(*) | 'cuda';  
 
-[sampling]        # The existence of the Table, sets do_sampling to True
-do_sampling = true      # Whether to perform sampling or not (Takes priority)
-method = 'md'           # 'md'(*) | 'rattle'; How to sample geometries
-calculator = 'tblite'   # 'tblite'(*) | 'xtb' | 'mace-off23' | 'mace-mp0' | 'ani'; Calculator to use for the sampling method
-mace_model_path = '/path/to/model/MACE.model'   # Path if using a mace fine-tuned model 
-device = 'cpu'          # 'cpu'(*) | 'cuda'; Device to run on
+[sampling] # The existence of the Table, sets do_sampling to True
+do_sampling = true                            # Whether to perform sampling or not (Takes priority)
+method = 'md'                                 # 'md'(*) | 'rattle'; How to sample geometries
+calculator = 'tblite'                         # 'tblite'(*) | 'xtb' | 'mace-off23' | 'mace-mp0' | 'ani'; Calculator to use for the sampling method
+mace_model_path = '/path/to/model/MACE.model' # Path if using a mace fine-tuned model 
+device = 'cpu'                                # 'cpu'(*) | 'cuda'; Device to run on
 
-  [sampling.md]
-    sampling_interval = 20
-    temperature = 500
-    md_steps = 1000
+[sampling.md]
+sampling_interval = 20
+temperature = 500
+md_steps = 1000
 
-  [sampling.rattle]    # For mor info, look at HiPhive doc: https://hiphive.materialsmodeling.org/advanced_topics/structure_generation.html
-    rattle_method = 'mc'     # 'mc'(*) | 'standard'
-    rattle_structures = 10   # how many rattle geometries at each structure
-    rattle_std = 0.12
+[sampling.rattle] # For mor info, look at HiPhive doc: https://hiphive.materialsmodeling.org/advanced_topics/structure_generation.html
+rattle_method = 'mc'   # 'mc'(*) | 'standard'
+rattle_structures = 10 # how many rattle geometries at each structure
+rattle_std = 0.12
 
-    [sampling.rattle.optimize]   # Whether to preoptimize the rattled structures 
-      fmax = 10                  # Max force in atoms
-      max_step = 0.1             # Biggest atom movement at every optimization step
+[sampling.rattle.optimize] # Whether to preoptimize the rattled structures 
+fmax = 10      # Max force in atoms
+max_step = 0.1 # Biggest atom movement at every optimization step
 
 # ---------------------------
 # Calculation parameters
 # ---------------------------
 # Quantum Mechanical Calculator
 [calculator]
-calculate_forces = false   # If true: DFT forces will be calculated
-calculator = 'qe'          # 'qe'(*) | 'aims'  Use [Quantum Espresso | FHI-AIMS] as calculator for DFT energies/forces
-write_input_file = true    # Writes the input file regardless forces being calculated
+calculate_forces = false # If true: DFT forces will be calculated
+calculator = 'qe'        # 'qe'(*) | 'aims'  Use [Quantum Espresso | FHI-AIMS] as calculator for DFT energies/forces
+write_input_file = true  # Writes the input file regardless forces being calculated
 
-  # Set the QE calculator parameters
-  [calculator.qe]
-    calculation = 'scf'
-    # ecutwfc = 30        # Commented plane-wave wave-function cutoff
-    ecutwfc = 50          # plane-wave wave-function cutoff
-    ecutrho = 600         # density wave-function cutoff
-    conv_thr = 1e-8       # DFT self-consistency convergence
-    forc_conv_thr = 1e-3  # Force convergence threshold
-    etot_conv_thr = 1e-5  # Total energy convergence threshold
-    nstep = 100           # Total ionic steps
-    pseudo_dir = "~/pseudos/qe/SSSP_1.1.2_PBE_precision/"
-    vdw_corr = "xdm"
-    occupations = "smearing"   # Add smearing
-    smearing = "cold"  # smearing kind
-    degauss = 0.02     # smearing amount
-    tprnfor = true     # Print forces
-    tstress = true     # Print stress tensor
-    kpts = [1,1,2]     # If not given, Gamma will be used
-    # In principle you can keep puting here any QE keyword you need...
+# Set the QE calculator parameters
+[calculator.qe]
+calculation = 'scf'
+# ecutwfc = 30        # Commented plane-wave wave-function cutoff
+ecutwfc = 50                                          # plane-wave wave-function cutoff
+ecutrho = 600                                         # density wave-function cutoff
+conv_thr = 1e-8                                       # DFT self-consistency convergence
+forc_conv_thr = 1e-3                                  # Force convergence threshold
+etot_conv_thr = 1e-5                                  # Total energy convergence threshold
+nstep = 100                                           # Total ionic steps
+pseudo_dir = "~/pseudos/qe/SSSP_1.1.2_PBE_precision/"
+vdw_corr = "xdm"
+occupations = "smearing"                              # Add smearing
+smearing = "cold"                                     # smearing kind
+degauss = 0.02                                        # smearing amount
+tprnfor = true                                        # Print forces
+tstress = true                                        # Print stress tensor
+kpts = [1, 1, 2]                                      # If not given, Gamma will be used
+# In principle you can keep puting here any QE keyword you need...
 
-    [calculator.qe.pseudos]  # Not mandatory, but recomended
-      C = 'C.pbe-n-kjpaw_psl.1.0.0.UPF'
-      O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
+[calculator.qe.pseudos] # Not mandatory, but recomended
+C = 'C.pbe-n-kjpaw_psl.1.0.0.UPF'
+O = 'O.pbe-n-kjpaw_psl.0.1.UPF'
 
-  # Set the FHI-AIMS calculator parameters
-  [calculator.aims]
-  # TODO:
-
-    [calculator.aims.outputs]  # Not mandatory, but recomended
-    # TODO:
+# Set the FHI-AIMS calculator parameters
+[calculator.aims]
+species_dir = '/user/home/opt/fhi-aims/species_defaults/defaults_2020/light'
+# control={'calculation': 'relax'},
+xc = 'pw-lda'
+occupation_type = 'gaussian 0.04'
+sc_accuracy_etot = 1e-4
+sc_accuracy_eev = 1e-3
+k_grid = [1, 1, 8]
+DFPT = 'dielectric'
+# DFPT_centralised = True,   # In new AIMS versions is True by defaul
+# DFPT_width = 0.01
+command = 'mpirun -n 16 /usr/license/fhi-aims/bin/aims.x'
+# In principle you can keep adding here any FHI-AIMS keyword you need
+output = ['dipole']
 
 # ---------------------------
 # Visualization parameters

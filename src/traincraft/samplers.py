@@ -10,7 +10,14 @@ import calculeitors
 from config import config
 
 
-def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=500, timestep=1, md_steps=1000):
+def sampling_from_MD(
+    system,
+    method="tblite",
+    sampling_interval=20,
+    temperature=500,
+    timestep=1,
+    md_steps=1000,
+):
     """
     Performs a Molecular Dynamic using as calculator:
      - ani: torchani (ANAKIN-ME like Deep Learning potentials)
@@ -34,49 +41,49 @@ def sampling_from_MD(system, method='tblite', sampling_interval=20, temperature=
         timestep = config.sampling_md_timestep
         md_steps = config.sampling_md_steps
 
-        # # FIXME: It has to be a nicer way to handle mace_params than this
-        #
-        # mace_params = {'mace_model_path': None,
-        #                'device': None}
-        # if method.startswith('mace'):
-        #     mace_model_path = config.sampling_mace_model_path
-        #     device = config.sampling_device
-        #     mace_params = {'mace_model_path': mace_model_path,
-        #                    'device': device}
-
-        mace_params = {'mace_model_path': config.sampling_mace_model_path,
-                       'device': config.sampling_device} if method.startswith('mace') else {}
+        params = {}
+        if method.startswith("mace"):
+            params["mace_model"] = config.sampling_mace_model_path
+            params["device"] = config.sampling_device
+        if method.startswith("nep"):
+            # TODO: Implement NEP potentials
+            pass
 
     # system.pbc = np.array([False, False, False])
-    system.calc = calculeitors.get_aproximate_calculator(method, **(mace_params or {}))
+    system.calc = calculeitors.get_aproximate_calculator(method, **params)
 
-    def sample_geometry(format='extxyz'):
+    def sample_geometry(format="extxyz"):
         """Samples a geometry from the MD"""
         # M: to dirman
         import uuid
-        calcfile = str(uuid.uuid4()).split('-')[4]
+
+        calcfile = str(uuid.uuid4()).split("-")[4]
 
         # Define the subfolder path to save the sampled geometries
         sampling_subfolder = "MD_sampled_geometries"
         os.makedirs(sampling_subfolder, exist_ok=True)
 
         # Save the sampled geometry in the subfolder
-        filepath = os.path.join(sampling_subfolder, calcfile + '.' + format)
+        filepath = os.path.join(sampling_subfolder, calcfile + "." + format)
         write(filepath, system)
         # write('trajectory.extxyz', system, append=True)
 
     # M: to calculeitors?
     dyn = Langevin(system, timestep * units.fs, temperature * units.kB, 0.2)
 
-    traj = Trajectory('md.traj', 'w', system)
+    traj = Trajectory("md.traj", "w", system)
     dyn.attach(traj.write, interval=sampling_interval)
     dyn.attach(sample_geometry, interval=sampling_interval)
 
-    logging.info(f'MD with {method} started:')
-    logging.info(f'  T = {temperature}; MD steps = {md_steps}; timestep  = {timestep} fs; sampling every {sampling_interval} steps')
+    logging.info(f"MD with {method} started:")
+    logging.info(
+        f"  T = {temperature}; MD steps = {md_steps}; timestep  = {timestep} fs; sampling every {sampling_interval} steps"
+    )
     dyn.run(md_steps)
-    sampled_structures = floor(md_steps/sampling_interval)
-    logging.info(f'  MD finished. Saved in md.traj. Sampled {sampled_structures} strcutures')
+    sampled_structures = floor(md_steps / sampling_interval)
+    logging.info(
+        f"  MD finished. Saved in md.traj. Sampled {sampled_structures} strcutures"
+    )
 
 
 #   M: gengeom
@@ -105,13 +112,16 @@ def gen_rattled_geometries(system, min_distance=1.3):
     # """
 
     from ase.io import write
+
     # from hiphive import ClusterSpace, StructureContainer, ForceConstantPotential
     # from trainstation import Optimizer
     # from hiphive.utilities import prepare_structures
     # from hiphive.structure_generation import generate_rattled_structures
-    from hiphive.structure_generation import (generate_rattled_structures,
-                                              generate_mc_rattled_structures,
-                                              generate_phonon_rattled_structures)
+    from hiphive.structure_generation import (
+        generate_rattled_structures,
+        generate_mc_rattled_structures,
+        generate_phonon_rattled_structures,
+    )
 
     method = config.sampling_calculator
     rattled_structures = config.sampling_rattle_nstructures
@@ -119,13 +129,11 @@ def gen_rattled_geometries(system, min_distance=1.3):
     rattle_method = config.sampling_rattle_method
 
     # FIXME: It has to be a nicer way to handle mace_params than this
-    mace_params = {'mace_model_path': None,
-                   'device': None}
-    if method.startswith('mace'):
+    mace_params = {"mace_model_path": None, "device": None}
+    if method.startswith("mace"):
         mace_model_path = config.sampling_mace_model_path
         device = config.sampling_device
-        mace_params = {'mace_model_path': mace_model_path,
-                       'device': device}
+        mace_params = {"mace_model_path": mace_model_path, "device": device}
 
     calc = calculeitors.get_aproximate_calculator(method, **mace_params)
 
@@ -135,33 +143,42 @@ def gen_rattled_geometries(system, min_distance=1.3):
     # write('reference_structure.xyz', supercell)
 
     # standard rattle
-    if rattle_method == 'standard':
-        logging.info(f'Rattling: {rattle_method}; Rattled structures: {rattled_structures}; Rattle std: {rattle_std}')
+    if rattle_method == "standard":
+        logging.info(
+            f"Rattling: {rattle_method}; Rattled structures: {rattled_structures}; Rattle std: {rattle_std}"
+        )
         for i in range(rattled_structures):
-            seed = np.random.randint(2**32-2)
-            structure_rattle = generate_rattled_structures(system, 1, rattle_std, seed=seed)
+            seed = np.random.randint(2**32 - 2)
+            structure_rattle = generate_rattled_structures(
+                system, 1, rattle_std, seed=seed
+            )
             # TODO: Work out the folder storage/retrieval
-            write('structures_rattle_' + str(i) + '.extxyz', structure_rattle)
+            write("structures_rattle_" + str(i) + ".extxyz", structure_rattle)
 
     # Monte Carlo rattle
-    if rattle_method == 'mc':
-        logging.info(f'Rattling: {rattle_method}; Rattled structures: {rattled_structures}; Rattle std: {0.25 * rattle_std}; Min distance: {min_distance}')
+    if rattle_method == "mc":
+        logging.info(
+            f"Rattling: {rattle_method}; Rattled structures: {rattled_structures}; Rattle std: {0.25 * rattle_std}; Min distance: {min_distance}"
+        )
         for i in range(rattled_structures):
-            seed = np.random.randint(2**32-2)
+            seed = np.random.randint(2**32 - 2)
             try:
                 structures_mc_rattle = generate_mc_rattled_structures(
-                    system, 1, 0.25*rattle_std, min_distance, n_iter=20, seed=seed)
-                write(f'structures_mc_rattle_{i}.extxyz', structures_mc_rattle)
+                    system, 1, 0.25 * rattle_std, min_distance, n_iter=20, seed=seed
+                )
+                write(f"structures_mc_rattle_{i}.extxyz", structures_mc_rattle)
             except Exception as e:
                 logging.warn(e)
                 pass
 
-    rattle_goemetries = [f for f in os.listdir() if f.endswith('.extxyz')]
+    rattle_goemetries = [f for f in os.listdir() if f.endswith(".extxyz")]
 
     if config.sampling_optimize_rattled:
         fmax = config.sampling_optimize_rattled_fmax
         max_steps = config.sampling_optimize_rattled_maxStep
-        logging.info(f'Preoptimizing rattled geoemtries with Fmax: {fmax}; Max Steps: {max_steps}')
+        logging.info(
+            f"Preoptimizing rattled geoemtries with Fmax: {fmax}; Max Steps: {max_steps}"
+        )
         for geom in rattle_goemetries:
             system = read(geom)
             logging.info(f"  Optimizing rattled structure:{geom} ")
@@ -173,7 +190,7 @@ def gen_rattled_geometries(system, min_distance=1.3):
     p = Path(sampling_subfolder)
     os.makedirs(p, exist_ok=True)
     for f in rattle_goemetries:
-        os.rename(f, p/f)
+        os.rename(f, p / f)
     #
     #   # Phonon rattle
 
