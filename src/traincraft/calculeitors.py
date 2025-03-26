@@ -54,7 +54,7 @@ def get_aproximate_calculator(method="tblite", **params):
 
 
 def _get_mace_calculator(
-    method, mace_model="large", device="cpu", default_dtype="float64"
+    method, mace_model="large", device="cpu", default_dtype="float32"
 ):
     if method == "mace-off23":
         from mace.calculators import mace_off as mace
