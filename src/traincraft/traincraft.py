@@ -12,12 +12,12 @@ import dirman
 # v Generate M different geometries
 # ~ Add results to the database (Done in separate script so far) v Better geometries generation  --> Packmol
 # v Generate sampling geometries --> From Tight Bidning MD
-# o ALLOW FOR FLEXIBLE WORKFLOW:
+# v Add more calculators
+# ~ Add gneration of different systems: Molecules, molecs on surfaces, crystals, intercalated molecules...
+# ~ ALLOW FOR FLEXIBLE WORKFLOW:
 #   - Sometimes you want generate geometries
 #   - sometimes you want to go through the generated geometries and do sth
-# o Add gneration of different systems: Molecules, molecs on surfaces, crystals, intercalated molecules...
 # o Analyse results
-# o Add more calculators
 # o Compare similarity between generated structures? Not at the moment...
 
 """
@@ -52,6 +52,8 @@ Output
         - QE output files
 
 """
+
+
 # TODO: Set a flexible (not lineal) WORKFLOW
 # # Workflow = ['preoptparams', 'gen_geom', 'preopt', 'sample_geometries', ...]
 # for work in config.workflow:
@@ -103,10 +105,10 @@ def run_traincraft():
             if config.calculate_f:
                 if config.do_sampling:
                     # Go through all generated .extxyz files and calcute their DFT forces
-                    if config.sampling_method == 'md':
-                        calculeitors.get_QM_forces_from_sampled(sampled_by='md')
-                    if config.sampling_method == 'rattle':
-                        calculeitors.get_QM_forces_from_sampled(sampled_by='rattle')
+                    if config.sampling_method == "md":
+                        calculeitors.get_QM_forces_from_sampled(sampled_by="md")
+                    if config.sampling_method == "rattle":
+                        calculeitors.get_QM_forces_from_sampled(sampled_by="rattle")
                 else:
                     # If not sampled geometries, just get the forces of the generated geometry
                     calculeitors.get_QM_forces(system)

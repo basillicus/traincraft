@@ -83,7 +83,7 @@ class Config:
         geom_generation : (str) or (bool) '*auto*' | 'manual' | False
             Determines how geometries will be generated
                 - manual: controls the displacement and rotation of the
-                  molecules with the keywords `rot_axis`, `rot_x`, `rot_y`, `rot_z`, etc
+                  molecules with te keywords `rot_axis`, `rot_x`, `rot_y`, `rot_z`, etc
                 - auto: will use Packmol to generate different geometries. Still
                   `rot_axis`, `rot_x`, `rot_y` and `rot_z`, can be used to provide Packmol
                   molecules with the desired orientation
@@ -130,12 +130,27 @@ class Config:
         # Options: 'manual' | 'auto'
         self.geom_generation = self.config.get("geom_generation", "auto")
 
+        # Options: filled_cnt | molecular
+        self.system = self.get("system", None)
+        if self.system is None and self.geom_generation:
+            print("\nERROR: key 'system' not specified")
+            print("""
+Please, set it as:
+    system = 'your_choice'
+
+Options are:
+ + cnt
+ + filled_cnt
+ + molecular
+ """)
+            sys.exit(1)
+
         # Number of different structures to be generated
         self.n_structures = self.config["structures"].get("n_structures", 1)
 
         # TODO: Implement this keywords.
         #   if type is molecule_on_surface, or molecular, or molecular_mix, or laminar
-        # Options: 'nanotube' | 'molecule' | 'crystal' | 'surface' | 'mol on surf' ...
+        # Options: '' | 'molecule' | 'crystal' | 'surface' | 'mol on surf' ...
         self.structure_type = self.config["structures"].get("type", "nanotube")
         # TODO: Implement this keyword.
         #  Allow for parcial periodic boundary conditions, or just molecular systems
@@ -151,12 +166,15 @@ class Config:
         if self.molecules is not None:
             # TODO:Allow molec to be a list, so different molecules
             # can be included in the same system
-            # Allow to give a input file with a geometry
+            #
+            # TODO:
+            # Allow to give a input file with a geometry: DONE!
             self.molec = self.config["molecules"].get("molecule", None)
-            if self.molec is None:
-                print("ERROR: key 'molecule' in table [molecules] not specified")
-                print("Some examples: H2O, CO, CO2, methane... you choose")
-                sys.exit(1)
+            # if self.molec is None:
+            #     print("ERROR: key 'molecule' in table [molecules] not specified")
+            #     print("Some examples: H2O, CO, CO2, methane... you choose")
+            #     sys.exit(1)
+            self.molec_from_file = self.config["molecules"].get("from_file", None)
 
             self.n_molecules = self.config["molecules"].get("n_molecules", 1)
             self.tolerance = self.config["molecules"].get("tolerance", 2.0)

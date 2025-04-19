@@ -10,14 +10,16 @@ title = 'Input file example for reference'
 # Building geometry parameters
 # ----------------------------
 geom_generation = 'auto' # 'manual'  : Manual geometry generation | 'auto'(*) : Use Packmol | false : Does not generate geometries
+system = 'filled_cnt'    #   if geom_generation: mandatory; Options: 'filled_cnt' | 'cnt' | 'molecular'
 
 [structures]
-n_structures = 5 # Total number of initial random geometries to be generated
+n_structures = 5    # Total number of initial random geometries to be generated
 
 [molecules]
-molecule = 'CO2'
+molecule = 'CO2'    # Use EITER molecule from_file keys, but not both
+from_file = '/path/to/geometry/file'  
 n_molecules = 3
-tolerance = 2    # Minimum intermolecular distance for Packmol to distribute the molecules
+tolerance = 2       # Minimum intermolecular distance for Packmol to distribute the molecules
 
 # compresion_factor = 1.0  # How close molecules will be inside the CNT, when geom_generation = 'manual'
 

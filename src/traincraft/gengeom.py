@@ -1,6 +1,6 @@
 """This modules deals with the daunting task of generating geometries"""
 
-# import sys
+import sys
 import os
 import logging
 # from pathlib import Path
@@ -11,6 +11,7 @@ import numpy as np
 from pathlib import Path
 
 from ase import Atoms
+
 # from ase.calculators.espresso import Espresso
 from ase.build import nanotube
 from ase.build import molecule
@@ -35,10 +36,67 @@ from config import config
 #   - one file for laminar materials
 #   - one file for molecules and conformers
 
-#   M: gengeom
-def generate_geometry_with_packmol():
+
+def get_molecule():
+    """Returns a molecule, either from ASE databse, or the one read from file"""
+
+    # Read from config
+    molec = config.molec
+    molec_from_file = config.molec_from_file
+    #
+    # Check there is no clashing option (molecule or molec_from_file)
+    print("molec", molec, "molec_from_file", molec_from_file)
+    if molec and molec_from_file:
+        print(
+            " ERROR: In table [molecules], choose either \n  'molecule' or \n  'from_file'\nbut not both"
+        )
+        logging.error(
+            "Choose either [molecules] 'molecule' or 'from_file', but not both"
+        )
+        sys.exit(1)
+    if molec:
+        mmol = molecule(molec)
+    elif molec_from_file:
+        mmol = get_geometry_from_file(molec_from_file)
+    else:
+        logging.error("Not molecule given")
+        sys.exit(1)
+
+    return mmol
+
+
+def get_geometry_from_file(filename: str):
     """
-    Generate geometry using PACKMOL via mdapackmol and MDAnalysis to
+    Reads geometry from a file and returns it as a dictionary.
+
+    Args:
+        filename (str): The path to the file containing the geometry data.
+
+    Returns:
+        ase.Atoms: An Atoms object representing the loaded geometry data.
+
+    Raises:
+        FileNotFoundError: If the specified file does not exist.
+        ValueError: If the file format is invalid.
+    """
+    try:
+        # with logging.getLogger(__name__).info("Reading geometry from file: %s", filename):
+        # with logging.info("Reading geometry from file: %s", filename):
+        geometry = read(filename)
+        return geometry
+    except FileNotFoundError as e:
+        logging.error(f"File not found: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Error reading geometry data: {e}")
+        raise
+
+    #   M: gengeom
+
+
+def generate_geometry_filled_cnt_auto():
+    """
+    Generate filled CNT geometry using PACKMOL via mdapackmol and MDAnalysis to
     preserve the topology after Packmol
     """
     import MDAnalysis as mda
@@ -47,26 +105,26 @@ def generate_geometry_with_packmol():
     import warnings
 
     # Read required config info
-    molec = config.molec
     n_molecules = config.n_molecules
     tolerance = config.tolerance
     cnt_gap = config.cnt_gap
     random_seed = config.random_seed
     # seed = config.seed
 
-    cnt_file = 'cnt_byFillMyTubes.pdb'
-    mol_file = 'mol_byFillMyTubes.pdb'
+    cnt_file = "cnt_byFillMyTubes.pdb"
+    mol_file = "mol_byFillMyTubes.pdb"
 
     # Generate the Nanotube and the molecules
     cnt = create_nanotube()
-    cnt.center(vacuum=cnt_gap/2, axis=(0, 1))
+    cnt.center(vacuum=cnt_gap / 2, axis=(0, 1))
     write(cnt_file, cnt)
     # write('cnt_byFillMyTubes.xyz', cnt)
-    mmol = molecule(molec)
+    mmol = get_molecule()
     mmol.center()
+
     write(mol_file, mmol)
     # write('mol_byFillMyTubes.xyz', mmol)
-    cell_parameters = utils.get_parameter_from_pdb(cnt_file, 'CRYST1')
+    cell_parameters = utils.get_parameter_from_pdb(cnt_file, "CRYST1")
 
     # Get ranges for PACKMOL
     cnt_xyz = cnt.get_positions()
@@ -75,10 +133,10 @@ def generate_geometry_with_packmol():
     min_z, max_z = min(cnt_xyz[:, 2]), max(cnt_xyz[:, 2])
 
     cnt_z_length = max_z - min_z
-    cnt_x_diameter = (max_x - min_x)/2
-    cnt_y_diameter = (max_y - min_y)/2
+    cnt_x_diameter = (max_x - min_x) / 2
+    cnt_y_diameter = (max_y - min_y) / 2
 
-    cnt_diameter = (cnt_x_diameter + cnt_y_diameter)/2
+    cnt_diameter = (cnt_x_diameter + cnt_y_diameter) / 2
 
     # cell_z = cnt.get_cell()[2][2]
 
@@ -90,37 +148,46 @@ def generate_geometry_with_packmol():
     # _molecule = mda.Universe('mol_byFillMyTubes.xyz')
 
     # This is confusing, but if we want to recreate the Packmol geometries we need to pass a
-    # different seed each time generated with the seed we gave to FillMyTubes
-    if random_seed == False:
-        seed = random.randint(1, 2**16-2)
+    # different seed each time generated with the seed we gave to TrainCraft
+    # if random_seed == False:
+    if not random_seed:
+        seed = random.randint(1, 2**16 - 2)
     else:
         seed = -1
 
     # call Packmol with MDAnalysis objects as arguments
     # the 'instructions' allow for any valid Packmol commands, one per line
-    with warnings.catch_warnings():   # Ignore some MDAanalysis warnings
-        warnings.simplefilter('ignore')
+    with warnings.catch_warnings():  # Ignore some MDAanalysis warnings
+        warnings.simplefilter("ignore")
         system = mdapackmol.packmol(
-            [mdapackmol.PackmolStructure(
-                _cnt, number=1,
-                instructions=[f'fixed 0. 0. {cnt_z_length/2} 0. 0. 0.', 'center']),
+            [
                 mdapackmol.PackmolStructure(
-                _molecule, number=n_molecules,
-                instructions=[f'inside cylinder 0. 0. 0. 0. 0. 1. {cnt_diameter-0.05} {cnt_z_length-tolerance/3}'])],
+                    _cnt,
+                    number=1,
+                    instructions=[f"fixed 0. 0. {cnt_z_length / 2} 0. 0. 0.", "center"],
+                ),
+                mdapackmol.PackmolStructure(
+                    _molecule,
+                    number=n_molecules,
+                    instructions=[
+                        f"inside cylinder 0. 0. 0. 0. 0. 1. {cnt_diameter - 0.05} {cnt_z_length - tolerance / 3}"
+                    ],
+                ),
+            ],
             tolerance=tolerance,
-            seed=seed
+            seed=seed,
         )
 
     # We do not need MDAnalysis Universe at the moment, we want ASE Atoms
     # so we read the geometry generated by packmol again with ASE
 
     # First we need to add the cell parameters that are missing after packmol
-    utils.insert_line_in_pdb('output.pdb', cell_parameters[:-1], 5)
+    utils.insert_line_in_pdb("output.pdb", cell_parameters[:-1], 5)
     # Read the output generated by Packmol
-    system = read('output.pdb')
+    system = read("output.pdb")
 
     # Clean up and sort out the mess
-    for f in [cnt_file, mol_file, 'packmol.stdout', 'output.pdb']:
+    for f in [cnt_file, mol_file, "packmol.stdout", "output.pdb"]:
         try:
             os.remove(f)
         except FileNotFoundError:
@@ -129,7 +196,13 @@ def generate_geometry_with_packmol():
     return system
 
 
-#   M: gengeom
+def generate_geometry_molecular_auto():
+    system = get_molecule()
+    return system
+
+    # M: gengeom
+
+
 def create_nanotube():
     """Clue: Creates a ...
 
@@ -149,9 +222,9 @@ def create_nanotube():
     cnt = nanotube(n, m, length=lenght, bond=bond_lenght)
 
     # mask = [atom.symbol == 'C' for atom in cnt]
-    if constraints == 'all':
-        constraints = FixAtoms(mask=[atom.symbol == 'C' for atom in cnt])
-        cnt.set_constraint(constraints)   # Lost afater PACKMOL
+    if constraints == "all":
+        constraints = FixAtoms(mask=[atom.symbol == "C" for atom in cnt])
+        cnt.set_constraint(constraints)  # Lost afater PACKMOL
         # TODO: Get coordinates of atoms with constraints, and create a function
         # to apply the constraints again after Packmol
         # IDEA (Fer): Save the indexes of the constrained atoms and apply them again after packmol
@@ -186,7 +259,7 @@ def create_nanotube():
 def add_molecules(cnt):
     # FIXME: At the moment this function is only called when gemetry is generated manually.
     # It could also be called in the auto mode, so molecules can be rotated before passed to PACKMOL
-    """ Add ONLY the molecules along the Z axis of the nanotube
+    """Add ONLY the molecules along the Z axis of the nanotube
     Does not add the nanotube itself
 
     Parameters
@@ -208,32 +281,33 @@ def add_molecules(cnt):
 
     rot_axis = config.molec_rot_axis
 
-# TODO:
-# Move manipulation functions out of this function so I can use it to manipulate
-# individual geometries so we can pass to PACKMOL molecules in the desired orientation.
-#   - My be useful when placing molecules outside the nanotube or on surfaces.
-    def rotate_molecule(molecule, axis=['x', 'y', 'z']):
+    # TODO:
+    # Move manipulation functions out of this function so I can use it to manipulate
+    # individual geometries so we can pass to PACKMOL molecules in the desired orientation.
+    #   - My be useful when placing molecules outside the nanotube or on surfaces.
+    def rotate_molecule(molecule, axis=["x", "y", "z"]):
         for ax in axis:
-            if ax == 'x':
-                molecule.rotate(get_rotation_angle(rot_x), 'x')
-            if ax == 'y':
-                molecule.rotate(get_rotation_angle(rot_y), 'y')
-            if ax == 'z':
-                molecule.rotate(get_rotation_angle(rot_z), 'z')
+            if ax == "x":
+                molecule.rotate(get_rotation_angle(rot_x), "x")
+            if ax == "y":
+                molecule.rotate(get_rotation_angle(rot_y), "y")
+            if ax == "z":
+                molecule.rotate(get_rotation_angle(rot_z), "z")
 
     def get_rotation_angle(angle):
         if angle is None:
             return 0
         if isinstance(angle, dict):
-            return random.uniform(angle['min'], angle['max'])
+            return random.uniform(angle["min"], angle["max"])
         else:
             return angle
 
     # It will arrange the molecules along the Z axis of the CNT
     if n_molecules > 0:
         molecular_distance_z = (
-            cnt.get_cell()[2][2])/(n_molecules) * compresion_factor
-        print('molecular distance', molecular_distance_z)
+            (cnt.get_cell()[2][2]) / (n_molecules) * compresion_factor
+        )
+        print("molecular distance", molecular_distance_z)
 
     rotate = rot_x or rot_y or rot_z
 
@@ -252,9 +326,9 @@ def add_molecules(cnt):
             molecules = mmol
 
         else:
-            molecules = attach(molecules, mmol,
-                               distance=molecular_distance_z,
-                               direction=(0, 0, 1))
+            molecules = attach(
+                molecules, mmol, distance=molecular_distance_z, direction=(0, 0, 1)
+            )
     return molecules
 
 
@@ -272,7 +346,7 @@ def set_cell(system):
     """
     # if system = cnt:
     cnt_gap = config.cnt_gap
-    system.center(vacuum=cnt_gap/2, axis=(0, 1))
+    system.center(vacuum=cnt_gap / 2, axis=(0, 1))
 
     # OLD Manual Way
     # # Get the limits of the CNT
