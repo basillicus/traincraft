@@ -1,0 +1,40 @@
+# Example 01 — Carbon nanotube, EMT calculator, Langevin MD sampling
+#
+# The "walking skeleton": every stage is active, zero heavy dependencies.
+# Run with:  traincraft run examples/01_cnt_emt_md.toml
+#
+# What it does:
+#   1. Builds a (5,0) CNT with 6 Å vacuum along x/y.
+#   2. Runs 50 steps of Langevin MD at 300 K with ASE EMT — generates 6 frames.
+#   3. Filters through the selection funnel: physicality → dedup → diversity.
+#   4. Keeps at most 3 diverse frames and writes dataset.extxyz with provenance.
+
+[run]
+name   = "01_cnt_emt_md"
+outdir = "runs"
+seed   = 42
+
+[geometry.builder]
+type   = "nanotube"
+n      = 5
+m      = 0
+length = 1
+vacuum = 6.0
+
+[calculator]
+type = "emt"       # ASE built-in: no extra dependencies
+
+[sampling]
+type        = "md"
+temperature = 300.0
+steps       = 50
+interval    = 10
+timestep    = 1.0  # fs
+
+[selection]
+steps        = ["physicality", "dedup", "diversity"]
+budget       = 3
+min_distance = 0.7  # Å — drop frames where any two atoms are closer than this
+
+[dataset]
+path = "dataset"

@@ -1,0 +1,46 @@
+# Example 04 — Nanotube supercell + rattle + aggressive diversity filtering
+#
+# Requires:  pixi install -e science   (or: pip install hiphive)
+# Run with:  traincraft run examples/04_nanotube_supercell_rattle.toml
+#
+# What it does:
+#   1. Builds an (8,0) CNT (1 unit cell).
+#   2. Repeats it 3× along z to get a proper supercell for rattle.
+#   3. Generates 20 rattled structures.
+#   4. Keeps 10 most diverse (after physicality + dedup).
+#
+# Rattle is fast and well-suited for periodic systems like nanotubes.
+
+[run]
+name   = "04_cnt_supercell_rattle"
+outdir = "runs"
+seed   = 99
+
+[geometry.builder]
+type   = "nanotube"
+n      = 8
+m      = 0
+length = 1
+vacuum = 6.0
+
+[[geometry.transforms]]
+type   = "supercell"
+repeat = [1, 1, 3]    # triple along the tube axis
+
+[calculator]
+type = "emt"
+
+[sampling]
+type         = "rattle"
+method       = "mc"
+n_structures = 20
+std          = 0.08
+min_distance = 1.2
+
+[selection]
+steps        = ["physicality", "dedup", "diversity"]
+budget       = 10
+min_distance = 0.8
+
+[dataset]
+path = "dataset"

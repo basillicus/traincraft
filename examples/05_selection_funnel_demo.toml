@@ -1,0 +1,40 @@
+# Example 05 — Selection funnel demonstration
+#
+# Run with:  traincraft run examples/05_selection_funnel_demo.toml
+#
+# What it does:
+#   1. Builds a water molecule.
+#   2. Generates many perturbed structures via MD (100 steps, sample every 5).
+#   3. Shows the full funnel: physicality → dedup → diversity with a tight budget.
+#
+# Try changing `budget` (e.g. 2, 5, 10) or removing stages from `steps` to
+# see how each filter affects the output dataset size.
+# Try changing `min_distance` to see physicality filtering in action.
+
+[run]
+name   = "05_funnel_demo"
+outdir = "runs"
+seed   = 1234
+
+[geometry.builder]
+type   = "molecule"
+name   = "H2O"
+vacuum = 8.0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type        = "md"
+temperature = 500.0   # high T → more structural diversity
+steps       = 100
+interval    = 5       # dense sampling: 20 candidate frames
+
+[selection]
+# Try commenting out stages or reordering them:
+steps        = ["physicality", "dedup", "diversity"]
+budget       = 5          # keep only 5 diverse frames out of ~20
+min_distance = 0.6        # Å — physicality threshold
+
+[dataset]
+path = "dataset"

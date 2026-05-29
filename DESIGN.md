@@ -1,8 +1,10 @@
 # TrainCraft — Design
 
-> Status: proposed architecture for the greenfield rewrite. The legacy code
-> (git `e39647c`) is the citable baseline for the Raman work and is being
-> replaced, not extended. No backward compatibility is maintained.
+> **Status:** Phase 0 foundation + vertical slice implemented (`d43d3b8`).
+> The legacy code (git `e39647c`) is the citable Raman baseline and is no
+> longer part of this repository. No backward compatibility is maintained.
+
+---
 
 ## 1. What TrainCraft is
 
@@ -12,27 +14,33 @@ with an **active-learning** cycle that only spends expensive DFT on structures
 that actually improve the model.
 
 It must learn and validate **energies, forces, dipoles, and polarizabilities**
-(the last two enable IR/Raman spectra, the original scientific driver).
+(the last two enable IR/Raman spectra — the original scientific driver).
+
+---
 
 ## 2. Design principles
 
 1. **Pure, parameterized functions.** Every step takes typed inputs and returns
    typed outputs/artifacts. No import-time side effects, no global config, no
-   `os.chdir`. This is what makes the pipeline testable, library-usable, and
-   parallelizable.
+   `os.chdir`. This makes the pipeline testable, library-usable, and parallelizable.
 2. **Plugins behind a registry.** New geometry builders, calculators, samplers,
-   selectors, and models register themselves; the engine looks them up by name.
-   Adding a capability = adding one file, never editing a dispatcher.
-3. **One spine.** The **dataset + selection layer** is the center of the project.
-   Geometry generation feeds candidates in; the active-learning loop is just
+   selectors, and models register themselves with `@register`; the engine looks
+   them up by name from config. Adding a capability = one new file, no dispatcher
+   to edit.
+3. **One spine.** The **dataset + selection layer** is the center. Geometry
+   generation feeds candidates in; the active-learning loop is
    *explore → select → label → train → repeat* over that layer.
-4. **Orchestration is the last, swappable layer.** A trivial local engine runs
+4. **Orchestration is the last, swappable layer.** A local serial engine runs
    everything now; QuACC (or Covalent/Parsl/Dask) drops in later without
    touching the science.
-5. **Provenance everywhere.** Every structure and dataset frame records how it
-   was made (source, builder, transforms, calculator, model version, seed).
+5. **Provenance everywhere.** Every structure and frame records how it was made
+   (source, builder, transforms, calculator, model version, seed). An `origin`
+   tag (`generated` → `ml_sampled` → `ml_labeled` → `dft_labeled`) keeps the
+   expensive DFT dataset cleanly separable.
 6. **Config is data.** Validated pydantic models, serializable to/from TOML —
    the same serialized form a future node editor would emit.
+
+---
 
 ## 3. High-level architecture
 
@@ -59,221 +67,292 @@ It must learn and validate **energies, forces, dipoles, and polarizabilities**
                                   │                               ▲
                            ┌──────────────┐                       │
                            │ CALCULATORS  │───────────────────────┘
-                           │ MLIP + DFT   │
+                           │ potentials + │
+                           │ DFT          │
                            └──────────────┘
 ```
+
+---
 
 ## 4. Package layout
 
 ```
 src/traincraft/
   __init__.py            # curated public API
-  config/                # pydantic models per stage + TOML loader + validation
+  cli.py                 # Typer: run / validate / new / plugins
+  config/
+    models.py            # pydantic v2 models (discriminated unions on `type`)
+    loader.py            # TOML → validated TrainCraftConfig
   core/
-    structure.py         # Structure: ase.Atoms + provenance + properties
-    registry.py          # generic plugin registry + @register decorators
-    workspace.py         # explicit Run/Job dirs (replaces all os.chdir)
-    results.py           # typed results (energy, forces, dipole, polarizability, paths)
-    provenance.py        # how-was-this-made records
+    structure.py         # Structure: ase.Atoms + properties + provenance + hash
+    provenance.py        # Provenance record + origin tags
+    registry.py          # generic plugin registry + @register
+    workspace.py         # Workspace / Job — absolute dirs, no os.chdir
+    results.py           # Result: typed calc outputs
+    rng.py               # seeded numpy Generator factory
   geometry/
-    sources/             # scratch, smiles, file (any ASE format), url, db/optimade/MP
-    builders/            # crystal, defect, surface, layered, intercalation,
-                         #   adsorbate, polymer (PySoftK), nanotube, liquid/packmol
-    transforms/          # supercell, strain, rotate, perturb, vacuum, pbc, constraints
+    sources/             # file (any ASE format), scratch (ase.build)
+                         #   Phase 2: SMILES (RDKit), URL, OPTIMADE/MP
+    builders/            # nanotube, molecule
+                         #   Phase 2: crystal+defects, surface, layered,
+                         #            intercalation, adsorbate, polymer (PySoftK),
+                         #            liquid/confined (Packmol)
+    transforms/          # vacuum, supercell, perturb
+                         #   Phase 2: strain, rotate, pbc, constraints
   calculators/
-    base.py              # CalculatorFactory protocol; property capabilities
-    mlip.py              # mace (+ registry for MatterSim/Orb/SevenNet/CHGNet); tblite, xtb
-    dft.py               # qe, aims; E/F/stress + dipole + polarizability (DFPT)
-  sampling/              # md.py, monte_carlo.py, rattle.py  (Sampler plugins)
-  selection/             # physicality, dedup, uncertainty, diversity (FPS), budget
-  datasets/              # extxyz/db IO, dedup, splitting, provenance, HEALTH tooling
-  training/              # MACE fine-tune/train wrapper, multi-head config, metrics
-  validation/            # parity, learning curves, MD stability, EOS/phonons, IR/Raman
-  active_learning/       # the loop + convergence criteria
-  orchestration/         # engine adapters: local (now), quacc/covalent/... (later)
-  cli.py                 # thin Typer shell over the public API
+    base.py              # CalculatorFactory protocol + capability declarations
+    potentials.py        # cheap calcs — these are NOT all MLIPs:
+                         #   emt (force field, zero deps)
+                         #   tblite / xtb (semiempirical, GFN-xTB)
+                         #   mace (MLIP: foundation + fine-tuned models)
+    dft.py               # Phase 3: QE + FHI-AIMS, E/F/stress/dipole/polarizability
+  sampling/
+    base.py              # Sampler protocol (molecule-aware)
+    md.py                # Langevin MD (Langevin NVT via ASE)
+    rattle.py            # HiPhive standard/MC rattle
+    monte_carlo.py       # Phase 2: Metropolis MC + RDKit conformer moves
+  selection/
+    base.py              # Selector protocol + run_funnel
+    physicality.py       # min interatomic distance filter
+    dedup.py             # exact dedup by content hash
+    diversity.py         # farthest-point sampling (histogram descriptor now;
+                         #   SOAP/ACE via dscribe in Phase 2)
+                         #   Phase 5: uncertainty / committee selector
+  datasets/
+    io.py                # extxyz read/write with provenance
+    dataset.py           # Dataset: append (hash-dedup) + filter by origin
+                         #   Phase 4: health tooling (coverage, distributions,
+                         #            extrapolation grade, redundancy report)
+  training/              # Phase 4: MACE fine-tune/train, multi-head config
+  validation/            # Phase 4: parity, learning curves, MD stability,
+                         #          EOS/phonons, IR/Raman spectra reconstruction
+  active_learning/       # Phase 5: explore → select → label → retrain → converge
+  orchestration/
+    local.py             # serial engine (run_pipeline) — now
+                         #   Phase 6: QuACC / Covalent / Parsl adapter
 tests/
+examples/
+  01_cnt_emt_md.toml          # walking skeleton (zero deps)
+  02_molecule_emt_rattle.toml # rattle sampling
+  03_molecule_from_file.toml  # read geometry from file
+  04_nanotube_supercell_rattle.toml
+  05_selection_funnel_demo.toml
+  06_mace_mp0_sampling.toml   # MACE-MP0 as sampler
 ```
+
+---
 
 ## 5. Core abstractions
 
 ### 5.1 `Structure`
-A light wrapper around `ase.Atoms` that carries:
-- the atoms (positions, cell, pbc, constraints)
-- computed **properties** (energy, forces, stress, dipole, polarizability) when present
-- **provenance** (source/builder/transform chain, seed, parent ids)
-- a stable content hash (for dedup and idempotent jobs)
-
-It converts cleanly to/from `ase.Atoms`, `pymatgen.Structure`, and RDKit mols
-(via `core`/`converter` helpers) so each builder can use the best library.
+A dataclass wrapping `ase.Atoms` + a `properties` dict
+(`energy`, `forces`, `stress`, `dipole`, `polarizability`) + a `Provenance` +
+a stable content `hash` (numbers, positions, cell rounded). Helpers
+`to_ase`/`from_ase`; stubs `to_pymatgen`/`to_rdkit` (Phase 2).
 
 ### 5.2 Registry
 ```python
-@register("builder", "surface")
-def build_surface(cfg: SurfaceConfig) -> Structure: ...
+@register("builder", "nanotube")
+def build_nanotube(cfg: NanotubeBuilder) -> Structure: ...
 ```
-Generic registries exist for: `source`, `builder`, `transform`, `calculator`,
-`sampler`, `selector`, `model`. Config names the plugin; the engine resolves it.
-Capabilities (e.g. "this calculator can produce polarizability") are declared on
-registration so the engine can validate a requested workflow up front.
+Kind → name → `{obj, capabilities}`. Built-in modules self-register on import;
+the engine resolves by name from config. `capabilities` (set of property names)
+lets the engine validate a requested workflow up front.
 
 ### 5.3 `Workspace` / `Job`
-Owns an **absolute** directory. Every step receives its output dir and returns
-results + artifact paths. There is **no CWD mutation anywhere**. Jobs are keyed
-by a hash of their inputs so reruns skip completed work (idempotency/resume).
+`Workspace(root)` owns an absolute directory. `Job` owns a sub-directory with a
+done-marker for idempotent rerun. ASE calculators receive `directory=` explicitly.
+**Nothing calls `os.chdir`.**
 
 ### 5.4 `Result`
-Typed container for outputs of a calculation: requested properties, their values,
-convergence status, wall time, calculator/model identity, and artifact paths.
+Typed container: requested properties, values, convergence status, wall time,
+calculator identity, artifact paths.
 
-## 6. Data model & properties
+---
 
-Dataset frames are stored as **extended XYZ** (plus an ASE-db index) with a fixed
-schema for per-structure (`energy`, `dipole`, `polarizability`, `stress`) and
-per-atom (`forces`) properties, all tagged with provenance and the labeling
-method/level of theory. A property is treated consistently across four layers:
+## 6. Data model and properties
+
+Frames are stored as **extended XYZ** (plus an ASE-db index) with a fixed schema.
+A property is treated consistently across four layers:
 **request → label (DFT) → train (MACE head) → validate**.
 
-### Property support matrix
+| Property | DFT labeling | MACE training | Validation |
+|----------|-------------|---------------|------------|
+| Energy | SCF (QE/AIMS) | yes | parity, EOS, learning curve |
+| Forces | SCF (QE/AIMS) | yes | parity per element, MD stability |
+| Stress | SCF (QE/AIMS) | yes | EOS / elastic |
+| Dipole | SCF (AIMS `output dipole`; QE) | yes (head) | parity, **IR spectrum** |
+| Polarizability | **DFPT** (AIMS dielectric; QE `ph.x`) | yes (head) | parity, **Raman spectrum** |
 
-| Property        | DFT labeling                         | MACE training | Validation               |
-|-----------------|--------------------------------------|---------------|--------------------------|
-| Energy          | SCF (QE/AIMS)                        | yes           | parity, EOS, learning curve |
-| Forces          | SCF (QE/AIMS)                        | yes           | parity (per element), MD stability |
-| Stress          | SCF (QE/AIMS)                        | yes           | EOS / elastic            |
-| Dipole          | SCF (AIMS `output dipole`; QE)       | yes (head)    | parity, **IR spectrum**  |
-| Polarizability  | **linear response / DFPT** (AIMS DFPT dielectric; QE `ph.x`) | yes (head) | parity, **Raman spectrum** |
+> Polarizability requires linear-response DFT (heavier than SCF). The labeler
+> models it as a distinct, costlier task, and selection accounts for the cost.
 
-> Polarizability is the expensive one (linear-response DFT). The labeler models
-> it as a distinct, costlier task, and selection accounts for that cost.
+---
 
-## 7. Geometry subsystem (the priority) — Source × Builder × Transform
+## 7. Geometry subsystem — Source × Builder × Transform
 
-Composable in three layers so any combination works:
+### Sources (→ `Structure`)
+`file` (any ASE-readable format), `scratch` (`ase.build` molecule/bulk). Phase 2
+adds: `smiles` (RDKit ETKDG), `url`, providers (Materials Project, OPTIMADE, PubChem).
 
-- **Sources** (ingest → `Structure`): from scratch (`ase.build`), from **SMILES**
-  (RDKit ETKDG + optimize), from **file** (`ase.io.read`, any format), from
-  **URL**, and from structured providers (Materials Project, OPTIMADE, PubChem).
-- **Builders** (system types): molecules & conformer ensembles; bulk crystals
-  (`ase.build.bulk`/spacegroup/pymatgen) + **defects** (vacancy/substitution/
-  interstitial); **surfaces/slabs**; **layered/2D** (stacking, spacing, twist);
-  **intercalation** (guest between layers); **molecules on surfaces** (adsorption
-  sites); **polymers** (PySoftK); **liquids/mixtures/confined** (Packmol — the
-  legacy nanotube filling ported here); **nanotubes**.
-- **Transforms** (composable post-ops): supercell, strain, rotate/translate,
-  perturb, vacuum/cell, set pbc, constraints. Fixes the legacy "constraints lost
-  after Packmol" bug via index-based reapplication.
+### Builders (system types)
+`nanotube`, `molecule`. Phase 2 adds: bulk crystals + defects (vacancy/substitution/
+interstitial), surfaces/slabs, layered/2D (stacking, interlayer spacing, twist),
+intercalation, molecules on surfaces (adsorption sites), polymers (PySoftK),
+liquids/mixtures/confined (Packmol).
 
-A geometry workflow is a declared `source → builder → [transforms]` pipeline.
+### Transforms (composable post-ops)
+`vacuum`, `supercell`, `perturb`. Phase 2 adds: strain, rotate, pbc, constraints
+(index-based reapplication after Packmol — fixes the legacy bug).
+
+---
 
 ## 8. Calculators
 
 A `CalculatorFactory` protocol returns an ASE calculator and declares which
 properties it can produce.
 
-- **MLIP** (`mlip.py`): MACE first-class (foundation + fine-tuned models, multi-
-  head). `tblite`/`xtb` kept for cheap exploration. A `model` registry makes
-  MatterSim/Orb/SevenNet/CHGNet one-file additions. **ANI and NEP removed.**
-- **DFT** (`dft.py`): QE and FHI-AIMS, each producing E/F/stress and, on request,
-  dipole and polarizability (DFPT). Labeled results are written to extxyz with
-  provenance — fixing the legacy gap where the main pipeline never wrote labels.
+**`potentials.py`** — *not all of these are MLIPs*:
+- `emt` — ASE force field, zero dependencies; default for tests and CI.
+- `tblite` / `xtb` — semiempirical GFN-xTB, good for molecules.
+- `mace` — MLIP; foundation models (`mace-mp0`, `mace-off23`) or a local
+  fine-tuned model via `model_path`. Plumbing corrected from the legacy code.
+  ANI and NEP are intentionally not ported (poor quality / CUDA-only).
+
+**`dft.py`** (Phase 3): QE and FHI-AIMS, each producing E/F/stress, and on
+request dipole and polarizability (DFPT). Results written to extxyz with
+level-of-theory provenance.
+
+---
 
 ## 9. Sampling
 
-`md` (Langevin/NVT/NVE), `monte_carlo`, and `rattle` (HiPhive) as `Sampler`
-plugins driven by an MLIP. Samplers produce candidate frames; they do **not**
-decide what gets labeled — that is the selection layer's job.
+`Sampler` protocol: `run(structure, calc, job, cfg) -> list[Structure]`. Designed
+molecule-aware so MC can do rigid-body moves and conformer generation.
 
-## 10. Selection funnel (solves the redundant-DFT problem)
+- **`md`** — Langevin NVT. Writes `.traj` into the job dir, returns frames.
+- **`rattle`** — HiPhive standard/MC rattle (optional dep).
+- **`monte_carlo`** — Phase 2: Metropolis MC with rigid-body translation/rotation
+  of molecules and RDKit conformer generation (ETKDG). Primary tool for complex
+  molecules on surfaces.
+
+---
+
+## 10. Selection funnel
 
 Runs entirely on cheap compute **before any DFT job is dispatched**:
 
 ```
 raw frames
-  → 1. PHYSICALITY  (min interatomic dist; |E|/|F| sanity from MLIP)
-  → 2. DEDUP        (near-duplicate removal in descriptor space: SOAP/ACE/MACE latents)
-  → 3. UNCERTAINTY  (committee/ensemble disagreement; keep informative frames)
-  → 4. DIVERSITY    (farthest-point / max-min sampling to cover the distribution)
-  → 5. BUDGET CAP   (top-N per iteration)  → DFT labeling
+  → 1. physicality  (min interatomic distance — catches clashing atoms)
+  → 2. dedup        (exact hash; near-dup via SOAP/dscribe in Phase 2)
+  → 3. uncertainty  (Phase 5: committee/ensemble disagreement)
+  → 4. diversity    (farthest-point sampling over histogram descriptor now;
+                     SOAP/ACE in Phase 2)
+  → 5. budget cap   → DFT labeling
 ```
 
-Each stage is a `selector` plugin; the funnel is configurable and reorderable.
+Each stage is a `selector` plugin; the funnel is configurable and reorderable
+from the TOML (`selection.steps = [...]`).
 
-## 11. Datasets & health tooling
+---
 
-- **IO:** extxyz + ASE db; dedup; stratified train/val/test split with leakage checks.
-- **Health (pre-training):** composition / chemical-space / volume / density
-  coverage maps; energy & per-element force distributions with outlier flags;
-  redundancy report (shared with selection); **extrapolation grade** (distance of
-  each frame from the training distribution).
+## 11. Datasets and health tooling
+
+- **IO:** extxyz + ASE db; hash-dedup; filter by `origin`/level-of-theory.
+- **Phase 4 health tooling:** composition/space/volume/density coverage maps;
+  energy and per-element force distributions with outlier flags; redundancy
+  report; **extrapolation grade** (distance of each frame from the training
+  distribution).
+
+---
 
 ## 12. Training
 
-A MACE fine-tune/train wrapper (`mace_run_train`, `--foundation_model` for
-fine-tuning) with explicit **multi-head** configuration (energy/forces +
-optional dipole + polarizability heads), checkpoint/continue support, and
-emitted metrics. Built so a new `model` backend implements the same train/eval
-interface.
+A MACE fine-tune/train wrapper (`mace_run_train`, `--foundation_model`) with
+explicit **multi-head** configuration (energy/forces + optional dipole +
+polarizability heads), checkpoint/continue support, and emitted metrics. The
+model interface is pluggable; adding MatterSim/Orb/SevenNet/CHGNet is one file.
+
+---
 
 ## 13. Validation / potential quality
 
 - Per-property **parity** + RMSE/MAE (E, F, dipole, polarizability), per element.
-- **Learning curves** (error vs dataset size) — informs "good enough".
-- Physical checks: NVE energy conservation, MD stability, RDF, EOS/phonons.
-- **Spectra validation:** reconstruct IR (dipole autocorrelation) and Raman
-  (polarizability autocorrelation) from MLIP-driven MD; compare to DFT/experiment.
+- **Learning curves** (error vs dataset size).
+- Physical checks: NVE conservation, MD stability, RDF, EOS/phonons.
+- **Spectra validation:** IR (dipole autocorrelation) and Raman (polarizability
+  autocorrelation) reconstructed from MLIP-driven MD vs DFT/experiment.
 - These metrics feed the active-learning convergence criterion.
+
+---
 
 ## 14. Active-learning loop
 
 ```
-seed dataset (few datasets / files)
+seed dataset
   → fine-tune MACE foundation model
-    → EXPLORE  (MD/MC on target systems; parallel fan-out)
-      → SELECT (the §10 funnel)
-        → LABEL (DFT on selected; parallel fan-out)
-          → APPEND → RETRAIN / continue fine-tune
-            → CONVERGENCE? (val force-RMSE & spectral error thresholds)
+    → EXPLORE  (MD/MC; parallel fan-out)
+      → SELECT (§10 funnel)
+        → LABEL (DFT; parallel fan-out)
+          → APPEND → RETRAIN
+            → CONVERGED? (val force-RMSE + spectral error thresholds)
               ├─ no  → loop
               └─ yes → done
 ```
 
-Exploration and labeling are embarrassingly parallel; training is one big GPU
-job. This is also where "train while generating" naturally falls out.
+---
 
 ## 15. Orchestration
 
-Stage functions are pure, so orchestration is pluggable:
-- **`local`** (now): plain Python, serial or threadpool — for dev/tests.
-- **QuACC** (planned): atomistic-native, engine-agnostic (Covalent/Parsl/Dask/
-  Prefect underneath), results store, HPC submission. Chosen later by simplicity.
+Stage functions are pure; orchestration is pluggable:
+- **`local`** (now): serial or threadpool — for dev/tests.
+- **QuACC** (Phase 6): atomistic-native, engine-agnostic (Covalent/Parsl/Dask/
+  Prefect), results store, HPC submission. Chosen by simplicity once the core
+  is proven.
 
-The adapter only wires existing pure functions into a DAG; no science lives here.
+---
 
 ## 16. Configuration
 
-A single validated config (pydantic → TOML) with one section per stage
-(`geometry`, `calculator`, `sampling`, `selection`, `training`,
-`active_learning`, `orchestration`). Fail-fast validation with clear messages.
-The serialized form is exactly what a node editor would produce/consume.
+One TOML, validated by pydantic, drives the whole workflow. Stage sections are
+optional — presence enables the stage. Plugin types are discriminated unions on
+a `type` field, so adding a plugin = adding one model + one registry entry. The
+serialized form is exactly what a future node editor would produce/consume.
 
-## 17. Library use & public API
+---
 
-`import traincraft` exposes a curated surface: build a `Structure`, attach a
-calculator, sample, select, label, train, validate — each usable standalone in a
-user's own scripts. The CLI is a thin shell over this API; nothing in the CLI is
-privileged.
+## 17. Library API
+
+`import traincraft` exposes a curated surface:
+
+```python
+tc.load_config(path)          # → TrainCraftConfig
+tc.build_geometry(cfg)        # → Structure
+tc.make_calculator(cfg)       # → ASE calculator
+tc.run_sampling(s, calc, job, cfg) # → list[Structure]
+tc.run_funnel(frames, cfg)    # → list[Structure]
+tc.run_pipeline(cfg)          # → summary dict
+tc.write_frames(path, frames) # write extxyz
+tc.read_frames(path)          # read extxyz → list[Structure]
+```
+
+---
 
 ## 18. Future: node-based workflow editor
 
 Because every step is a registered function with typed input/output configs, a
 workflow is a serializable DAG of `(node = registered function, ports = typed
-configs)`. A front-end (React-Flow/Rete.js) emits that DAG as the same config the
-engine already runs — a clean add-on, not a rewrite. Deferred, but kept feasible.
+configs)`. A React-Flow/Rete.js front-end emitting this DAG as TOML is a clean
+add-on, not a rewrite. Deferred, but kept feasible by the architecture.
 
-## 19. Explicitly out / removed vs legacy
+---
+
+## 19. What is out of scope / removed vs. legacy
 
 - `os.chdir`-driven IO, import-time config singleton, broken package layout.
 - ANI (poor quality) and NEP (CUDA-only) calculators.
-- Scattered if/elif calculator dispatch (replaced by registry).
-- Standalone post-processing scripts (folded into `datasets`).
+- Scattered `if/elif` calculator dispatch (replaced by registry).
+- Standalone post-processing scripts (folded into `datasets/`).
+- The name `mlip.py` — the file is `potentials.py` because EMT (force field)
+  and tblite/xtb (semiempirical) are **not** MLIPs.

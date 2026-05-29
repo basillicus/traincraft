@@ -4,74 +4,233 @@ Modular generation of training datasets for — and training of — machine-lear
 interatomic potentials (MLIPs), with a MACE-centric **active-learning** loop that
 only spends expensive DFT on structures that actually improve the model.
 
-> **Status:** greenfield rewrite in progress. The architecture is in
-> [`DESIGN.md`](DESIGN.md) and the phased plan in [`ROADMAP.md`](ROADMAP.md).
-> The legacy code (used for the Raman work) is preserved at git tag/commit
-> `e39647c`. This rewrite has **no backward compatibility** with it.
+> **Status:** greenfield rewrite in progress (`rewrite/foundation-vertical-slice`,
+> commit `d43d3b8`). Architecture: [`DESIGN.md`](DESIGN.md). Phased plan:
+> [`ROADMAP.md`](ROADMAP.md). Legacy Raman-work code is preserved at git commit
+> `e39647c` — this rewrite has **no backward compatibility** with it.
 
-## What works today (Phase 0 + vertical slice)
+---
 
-A complete, if thin, pipeline you can run with **zero heavy dependencies**:
+## Quickstart
 
-```
-geometry builder → cheap calculator → sampler → selection funnel → dataset
-```
+### 1 — Install
 
-```bash
-pip install -e ".[dev]"
-traincraft run examples/walking_skeleton.toml
-```
-
-This builds a small carbon nanotube, runs a short MD with ASE's EMT calculator,
-filters the frames through the selection funnel (physicality → dedup →
-diversity), and writes a provenance-tagged `dataset.extxyz` under
-`runs/skeleton_cnt/`.
-
-### CLI
+**With pixi (recommended — handles conda + pip together):**
 
 ```bash
-traincraft run <config.toml>       # run the whole workflow
-traincraft validate <config.toml>  # validate and show resolved stages
-traincraft new <path.toml>         # scaffold a starter config
-traincraft plugins                 # list registered plugins
+# Clone and enter the repo
+git clone <repo>
+cd traincraft
+
+# Core env (ASE, pydantic, typer — all that example 01–05 need):
+pixi install
+
+# Dev env (adds pytest + ruff):
+pixi install -e dev
+
+# Science env (adds HiPhive rattle, tblite, geometry tools, descriptors):
+pixi install -e science
+
+# MACE env (adds torch + mace-torch — heavy, downloads ~50 MB model on first run):
+pixi install -e mace
 ```
 
-## One TOML drives everything
+**With pip (no conda; works for pure-Python usage):**
 
-A single validated TOML declares the entire workflow; `traincraft run` executes
-it end to end. Adding a new geometry builder, calculator, sampler, or selector is
-one self-registering file — see [`DESIGN.md`](DESIGN.md).
+```bash
+pip install -e ".[dev]"               # core + dev tools
+pip install -e ".[dev,sampling]"      # + HiPhive rattle
+pip install -e ".[dev,semiempirical]" # + tblite/GFN-xTB
+pip install -e ".[dev,mace]"          # + MACE + torch
+```
 
-## Use it as a library
+### 2 — Run your first example
 
-Every stage is a pure function, usable on its own:
+```bash
+# No heavy deps needed — uses ASE EMT force field:
+pixi run -e dev traincraft run examples/01_cnt_emt_md.toml
+
+# Or with pip install:
+traincraft run examples/01_cnt_emt_md.toml
+```
+
+This builds a (5,0) carbon nanotube, runs 50 steps of Langevin MD, filters
+through the selection funnel (physicality → dedup → diversity), and writes 3
+provenance-tagged frames to `runs/01_cnt_emt_md/dataset.extxyz`.
+
+### 3 — Explore the output
+
+```
+runs/
+└── 01_cnt_emt_md/
+    ├── structures/initial.extxyz    ← generated geometry
+    ├── candidates/candidates.extxyz ← all MD frames
+    ├── candidates/md.traj           ← full ASE trajectory
+    ├── selected/selected.extxyz     ← post-funnel, pre-label
+    └── dataset.extxyz               ← the final dataset (with provenance)
+```
+
+Every frame in `dataset.extxyz` carries `tc_provenance` (origin, calculator,
+parent hash, seed) and `tc_energy` / `tc_forces` where available.
+
+### 4 — Validate or scaffold a config
+
+```bash
+traincraft validate examples/01_cnt_emt_md.toml  # check config, show stages
+traincraft new my_run.toml                        # write a starter config
+traincraft plugins                                # list all registered plugins
+```
+
+---
+
+## Examples
+
+| File | What it shows | Extra deps |
+|------|---------------|------------|
+| [`01_cnt_emt_md.toml`](examples/01_cnt_emt_md.toml) | Nanotube + EMT + MD | none |
+| [`02_molecule_emt_rattle.toml`](examples/02_molecule_emt_rattle.toml) | Molecule + rattle (HiPhive) | `sampling` |
+| [`03_molecule_from_file.toml`](examples/03_molecule_from_file.toml) | Load any ASE-readable file | none |
+| [`04_nanotube_supercell_rattle.toml`](examples/04_nanotube_supercell_rattle.toml) | Supercell + rattle | `sampling` |
+| [`05_selection_funnel_demo.toml`](examples/05_selection_funnel_demo.toml) | Selection funnel parameters | none |
+| [`06_mace_mp0_sampling.toml`](examples/06_mace_mp0_sampling.toml) | MACE-MP0 as sampler | `mace` |
+
+---
+
+## CLI reference
+
+```bash
+traincraft run      <config.toml>   # execute the full workflow
+traincraft validate <config.toml>   # parse + validate only
+traincraft new      <path.toml>     # write a starter config
+traincraft plugins                  # list registered plugins by kind
+```
+
+---
+
+## One TOML drives the whole workflow
+
+A single validated TOML declares every stage. Presence of a section enables that
+stage; its absence skips it. Adding a new geometry builder, calculator, sampler,
+or selector is one self-registering file — no dispatcher to edit.
+
+```toml
+[run]
+name   = "my_run"
+outdir = "runs"
+seed   = 42
+
+[geometry.builder]
+type   = "nanotube"   # or: molecule / crystal / surface / ...
+n = 8; m = 0; length = 2
+
+[calculator]
+type   = "mace"       # or: emt / tblite / xtb
+model  = "mace-mp0"
+
+[sampling]
+type        = "md"    # or: rattle / monte_carlo
+temperature = 500.0
+steps       = 1000
+
+[selection]
+steps  = ["physicality", "dedup", "diversity"]
+budget = 50
+
+[dataset]
+path = "dataset"
+```
+
+---
+
+## Use as a library
+
+Every stage is a pure function — use them directly in your own scripts:
 
 ```python
 import traincraft as tc
 
-cfg = tc.load_config("examples/walking_skeleton.toml")
+# Run the full pipeline from a config file
+cfg     = tc.load_config("examples/01_cnt_emt_md.toml")
 summary = tc.run_pipeline(cfg)
 
-# or compose pieces directly
+# Or compose individual steps
 structure = tc.build_geometry(cfg.geometry)
-calc = tc.make_calculator(cfg.calculator)
+calc      = tc.make_calculator(cfg.calculator)
+frames    = tc.run_sampling(structure, calc, job, cfg.sampling)
+selected  = tc.run_funnel(frames, cfg.selection)
+tc.write_frames("out.extxyz", selected)
 ```
+
+---
+
+## Package layout
+
+```
+src/traincraft/
+  __init__.py            # curated public API
+  cli.py                 # Typer shell (run / validate / new / plugins)
+  config/                # pydantic v2 models + TOML loader
+  core/                  # Structure, registry, Workspace, Result, provenance, rng
+  geometry/
+    sources/             # file, scratch  (SMILES/URL/MP — Phase 2)
+    builders/            # nanotube, molecule  (crystal/surface/… — Phase 2)
+    transforms/          # vacuum, supercell, perturb  (strain/rotate/… — Phase 2)
+  calculators/
+    potentials.py        # cheap calcs: emt (force field), tblite/xtb (semiempirical),
+                         #              mace (MLIP)  — these are NOT all MLIPs
+    dft.py               # QE + FHI-AIMS, E/F/stress/dipole/polarizability — Phase 3
+  sampling/              # md, rattle, monte_carlo (rigid-body + RDKit conformers)
+  selection/             # physicality, dedup, diversity (FPS), budget
+                         #   uncertainty/committee — Phase 5
+  datasets/              # extxyz IO, Dataset (dedup + filter by provenance)
+                         #   health tooling (coverage, distributions) — Phase 4
+  training/              # MACE fine-tune/train, multi-head — Phase 4
+  validation/            # parity, learning curves, IR/Raman spectra — Phase 4
+  active_learning/       # explore → select → label → train → converge — Phase 5
+  orchestration/
+    local.py             # serial engine (now)
+                         # QuACC / Covalent / Parsl adapter — Phase 6
+```
+
+---
+
+## Data organisation
+
+Runs write a predictable directory tree. DFT-labeled frames are always in a
+separate sub-directory so the expensive dataset is clean and shareable:
+
+```
+runs/<run-name>/
+  structures/      # generated geometries (origin: generated)
+  candidates/      # sampler output, all frames (origin: ml_sampled)
+  selected/        # post-funnel frames, queued for labeling
+  labeled_dft/     # DFT-labeled ← THE SHAREABLE DATASET  [Phase 3]
+                   #   + manifest.json with level-of-theory and counts
+  models/          # trained MACE checkpoints + metrics    [Phase 4]
+  logs/
+```
+
+Every frame carries an `origin` tag in its provenance:
+`generated` → `ml_sampled` → `ml_labeled` → `dft_labeled`.
+
+---
 
 ## Environment (pixi)
 
-Pixi mixes conda-forge (packmol, hiphive, DFT tooling) and PyPI (mace-torch,
-pysoftk, …) in one lockfile:
+Pixi mixes conda-forge (packmol, hiphive, tblite, QE) and PyPI (mace-torch,
+dscribe, mdapackmol-fmt) in a single reproducible lockfile.
 
-```bash
-pixi install            # default env
-pixi run test           # pytest
-pixi run slice          # run the walking-skeleton example
-```
+| Environment | Command | Contents |
+|-------------|---------|----------|
+| `default` | `pixi install` | core (ASE, pydantic, typer, tomlkit) |
+| `dev` | `pixi install -e dev` | + pytest, ruff, mypy |
+| `science` | `pixi install -e science` | + hiphive, tblite, geometry tools, dscribe |
+| `mace` | `pixi install -e mace` | + torch, mace-torch |
 
-Optional capability groups: `mace`, `geometry`, `semiempirical`, `descriptors`,
-`sampling` (HiPhive), `dev`.
+---
 
 ## License
 
-See [`LICENSE`](LICENSE). If you use the legacy TrainCraft in research, cite the
-Zenodo DOI `10.5281/zenodo.8174842` and the packages it builds on.
+See [`LICENSE`](LICENSE). If you use the legacy TrainCraft code (commit
+`e39647c`) in research, please cite Zenodo DOI `10.5281/zenodo.8174842` and
+the packages it builds on.

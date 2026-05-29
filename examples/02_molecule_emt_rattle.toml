@@ -1,0 +1,37 @@
+# Example 02 — CO2 molecule, EMT calculator, HiPhive rattle sampling
+#
+# Requires:  pixi install -e science   (or: pip install hiphive)
+# Run with:  traincraft run examples/02_molecule_emt_rattle.toml
+#
+# What it does:
+#   1. Builds a CO2 molecule with 8 Å vacuum.
+#   2. Generates 12 Monte-Carlo rattled structures (HiPhive) — cheap diversification.
+#   3. Filters for physicality + dedup and keeps the 6 most diverse.
+
+[run]
+name   = "02_molecule_emt_rattle"
+outdir = "runs"
+seed   = 7
+
+[geometry.builder]
+type   = "molecule"
+name   = "CO2"
+vacuum = 8.0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type         = "rattle"
+method       = "mc"      # Monte Carlo rattle (recommended — avoids close contacts)
+n_structures = 12
+std          = 0.10      # displacement standard deviation (Å)
+min_distance = 0.8
+
+[selection]
+steps        = ["physicality", "dedup", "diversity"]
+budget       = 6
+min_distance = 0.5
+
+[dataset]
+path = "dataset"

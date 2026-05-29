@@ -1,133 +1,129 @@
 # TrainCraft — Roadmap
 
-Phased, sequenced delivery. Each phase lists deliverables and acceptance
-criteria. The **dataset + selection layer is the spine**: geometry and the
-active-learning loop both build on it, so it lands right after the foundation.
+Phased, sequenced delivery. The **dataset + selection layer is the spine**:
+geometry and the active-learning loop both build on it.
 
-See `DESIGN.md` for the target architecture.
-
----
-
-## Phase 0 — Foundation (unblocks everything)
-
-**Goal:** a clean, installable, testable package with no globals and no `chdir`.
-
-Deliverables
-- Correct package: `__init__.py`, package-relative imports, `pip install -e .`
-  works, console script works.
-- Dependencies declared in `pyproject.toml`; `environment.yml` for conda/mamba.
-- `config/` — pydantic models + TOML loader + fail-fast validation. **No
-  import-time singleton**; config is injected.
-- `core/` — `Structure`, `registry`, `Workspace`/`Job` (absolute dirs, no
-  `chdir`), `Result`, `provenance`.
-- pytest + minimal CI; a tiny end-to-end smoke test of one geometry → MLIP path.
-- Fix legacy correctness bugs that survive into the new code (label-writing,
-  QE vs AIMS handling, MACE param plumbing, no bare `except`).
-
-Acceptance
-- `pip install -e .` + `traincraft --help` work from a clean env.
-- Tests green in CI; no module mutates global state on import; no `os.chdir`.
+See [`DESIGN.md`](DESIGN.md) for the target architecture.
 
 ---
 
-## Phase 1 — Dataset + selection spine
+## ✅ Phase 0 — Foundation + vertical slice  *(done, `d43d3b8`)*
 
-**Goal:** the center both tracks depend on.
+**Goal:** a clean, installable, testable package with no globals and no `chdir`,
+plus a thin end-to-end walking skeleton proving the architecture.
 
-Deliverables
-- `datasets/` — extxyz + ASE-db IO, content-hash dedup, stratified split,
-  provenance on every frame.
-- `selection/` — funnel plugins: physicality, dedup, uncertainty (committee),
-  diversity (FPS), budget cap; configurable order.
-- `calculators/mlip.py` — MACE (foundation + fine-tuned, multi-head aware),
-  `tblite`/`xtb` for cheap work. Registry for future models.
-- `sampling/` — `md`, `monte_carlo`, `rattle` as plugins.
-
-Acceptance
-- Given a pile of frames, the funnel returns a physical, deduped, informative,
-  diverse, budget-capped subset, with a redundancy report.
-- A sampler → selector → dataset round-trip runs locally with provenance intact.
+Delivered
+- Correct package (`__init__.py`, relative imports, `pip install -e .`, console
+  script), pixi env config (`pyproject.toml [tool.pixi.workspace]`), ruff +
+  pytest config, GitHub Actions CI.
+- `config/` — pydantic v2 models (discriminated unions, `extra=forbid`) + TOML
+  loader. **No import-time singleton.** One TOML still drives the whole workflow.
+- `core/` — `Structure` (+hash), `registry`, `Workspace`/`Job` (no `os.chdir`),
+  `Result`, `provenance`, seeded RNG.
+- `geometry/` — Source×Builder×Transform (file/scratch sources; nanotube/molecule
+  builders; vacuum/supercell/perturb transforms).
+- `calculators/potentials.py` — `emt` (force field), `tblite`/`xtb`
+  (semiempirical), `mace` (MLIP). ANI/NEP dropped. MACE plumbing fixed.
+- `sampling/` — `md` (Langevin NVT) and `rattle` (HiPhive) ported; molecule-aware
+  `monte_carlo` interface stubbed.
+- `selection/` — funnel: `physicality` → `dedup` → `diversity` (FPS) → `budget`.
+- `datasets/` — extxyz IO with provenance; `Dataset` (hash-dedup + origin filter).
+- `orchestration/local.py` — `run_pipeline` serial engine.
+- `cli.py` — `run` / `validate` / `new` / `plugins`.
+- `examples/` — 6 annotated examples covering different builders, samplers,
+  selection configs, and calculators.
+- 19 tests pass, ruff clean, CLI verified end-to-end.
 
 ---
 
-## Phase 2 — Geometry subsystem (priority breadth)
+## Phase 1 — Geometry breadth  *(next)*
 
-**Goal:** generate the system types you care about, from any source.
+**Goal:** generate all the system types that matter scientifically.
 
-Deliverables (incremental, each with a test)
-- Source × Builder × Transform framework; `converter` (ASE/pymatgen/RDKit).
-- Sources: scratch, file (any ASE format), SMILES (RDKit), URL, providers
-  (Materials Project / OPTIMADE / PubChem).
-- Builders: molecules/conformers → crystals + defects → surfaces → layered/2D →
-  intercalation → adsorbates (mol-on-surface) → polymers (PySoftK) → liquids/
-  confined (Packmol, legacy nanotube ported) → nanotubes.
-- Transforms: supercell, strain, rotate, perturb, vacuum, pbc, constraints
-  (index-based reapplication after Packmol).
+Deliverables (incremental; each with a test and an example)
+- `converter.py` — ASE ↔ pymatgen ↔ RDKit bridge.
+- Sources: `smiles` (RDKit ETKDG + optimize), `url` (download → read), providers
+  (Materials Project, OPTIMADE, PubChem).
+- Builders: bulk crystal + defects (vacancy/substitution/interstitial); surface/
+  slab; layered/2D (stacking, interlayer spacing, twist); intercalation; molecules
+  on surfaces (`ase.build.add_adsorbate` / pymatgen `AdsorbateSiteFinder`);
+  polymers (PySoftK); liquids/mixtures/confined (Packmol).
+- Transforms: strain, rotate, set pbc, constraints (index-based reapplication after
+  Packmol — fixes the legacy bug at `gengeom.py:155`).
+- `sampling/monte_carlo.py` — Metropolis MC with rigid-body moves + RDKit conformer
+  generation (ETKDG); primary tool for complex molecules on surfaces.
 
 Acceptance
 - Each builder produces a valid `Structure` with correct pbc/cell and provenance.
-- Legacy nanotube+CO2 dataset reproducible through the new geometry path.
+- Legacy nanotube+CO2 dataset reproducible via the new geometry path.
+- `examples/10_mol_on_surface.toml` and `examples/11_polymer.toml` work.
 
 ---
 
-## Phase 3 — DFT labeling with full property set
+## Phase 2 — DFT labeling with full property set
 
 **Goal:** label E/F/stress + dipole + polarizability.
 
 Deliverables
 - `calculators/dft.py` — QE and FHI-AIMS factories; SCF for E/F/stress; dipole
-  output; **polarizability via DFPT** (AIMS dielectric; QE `ph.x`).
+  output; **polarizability via DFPT** (AIMS `DFPT dielectric`; QE `ph.x`).
 - Labeled results written to extxyz with level-of-theory provenance.
-- Cost-aware labeling (polarizability flagged as the expensive task).
+- Cost-aware labeling (polarizability flagged as the expensive task; selection
+  accounts for the cost).
+- `runs/<name>/labeled_dft/` tree + `manifest.json` (level-of-theory, counts).
 
 Acceptance
-- A selected frame is labeled with all requested properties and lands in the
-  dataset with provenance; QE and AIMS paths both verified on a tiny system.
+- A selected frame is labeled with all requested properties and lands in
+  `labeled_dft/` with provenance; QE and AIMS paths verified on a tiny system.
 
 ---
 
-## Phase 4 — Training + validation (multi-head)
+## Phase 3 — Training + validation (multi-head MACE)
 
-**Goal:** train MACE on all properties and measure quality.
+**Goal:** train MACE on all properties and measure quality end-to-end.
 
 Deliverables
-- `training/` — MACE fine-tune/train wrapper (`--foundation_model`), explicit
-  multi-head config (energy/forces + dipole + polarizability), checkpoints,
-  metrics. Pluggable model interface.
-- `datasets/` health tooling: coverage maps, distributions, outliers,
-  extrapolation grade.
-- `validation/` — per-property parity + RMSE/MAE, learning curves, MD stability,
-  EOS/phonons, **IR/Raman spectra reconstruction** vs DFT/experiment.
+- `training/` — MACE fine-tune/train wrapper (`mace_run_train --foundation_model`),
+  explicit multi-head config (energy/forces + optional dipole + polarizability),
+  checkpoints, metrics. Pluggable model interface for future backends.
+- `datasets/` health tooling: composition/space/volume coverage maps; energy and
+  per-element force distributions with outlier flags; extrapolation grade;
+  redundancy report.
+- `validation/` — per-property parity + RMSE/MAE (per element), learning curves,
+  NVE/MD stability, EOS/phonons, **IR and Raman spectra reconstruction** from
+  MLIP-driven MD vs DFT/experiment.
 
 Acceptance
 - A fine-tuned model trains on a seed set and produces a quality report covering
-  every requested property, including a reconstructed Raman/IR spectrum.
+  every property, including reconstructed IR/Raman spectra.
 
 ---
 
-## Phase 5 — Active-learning loop
+## Phase 4 — Active-learning loop
 
-**Goal:** close the loop to convergence.
+**Goal:** close the loop to convergence automatically.
 
 Deliverables
-- `active_learning/` — explore → select → label → retrain → converge, with
-  thresholds drawn from `validation` (val force-RMSE, spectral error).
-- Resume/idempotency across iterations.
+- `selection/uncertainty.py` — committee/ensemble uncertainty selector (plugs into
+  the existing funnel).
+- `active_learning/` — explore → select → label → retrain → converge; thresholds
+  drawn from `validation` (val force-RMSE, spectral error); resume/idempotency
+  across iterations.
 
 Acceptance
-- Starting from a seed set, the loop runs ≥2 iterations unattended, the dataset
-  grows only with informative+diverse frames, and validation error decreases.
+- Starting from a seed set, the loop runs ≥2 iterations unattended; the dataset
+  grows only with informative + diverse frames; validation error decreases.
 
 ---
 
-## Phase 6 — Orchestration
+## Phase 5 — Orchestration
 
 **Goal:** parallelism without touching the science.
 
 Deliverables
-- `orchestration/` — `local` engine hardened; QuACC adapter expressing the AL
-  loop as a DAG with parallel explore/label fan-out. (Engine chosen by
-  simplicity after the core is proven.)
+- `orchestration/` — `local` engine hardened (threadpool for independent jobs);
+  QuACC adapter expressing the AL loop as a DAG with parallel explore/label fan-out.
+  Engine chosen by simplicity after the core is proven.
 
 Acceptance
 - The same AL workflow runs under `local` and the chosen engine with identical
@@ -135,22 +131,24 @@ Acceptance
 
 ---
 
-## Phase 7 — Polish & extras
+## Phase 6 — Polish & extras
 
-- Curated public API + library usage docs and examples.
-- Documentation site; tutorials reproducing the Raman use case.
-- Deferred, architecture-friendly: **node-based workflow editor** emitting the
-  serialized config DAG.
+- Full public API docs + library-usage tutorials (including the Raman use case).
 - Additional MLIP backends (MatterSim/Orb/SevenNet/CHGNet) via the model registry.
+- Deferred, architecture-friendly: **node-based workflow editor** emitting the
+  serialized TOML DAG.
 
 ---
 
-## Dependency graph (summary)
+## Dependency graph
 
 ```
-Phase 0 ─► Phase 1 ─► Phase 2 (geometry breadth)
-                 └──► Phase 3 ─► Phase 4 ─► Phase 5 ─► Phase 6 ─► Phase 7
+Phase 0 (done)
+  └─► Phase 1 (geometry breadth)
+  └─► Phase 2 (DFT labeling)   ─► Phase 3 (training + validation)
+                                         └─► Phase 4 (AL loop)
+                                                   └─► Phase 5 (orchestration)
+                                                             └─► Phase 6 (polish)
 ```
-Phase 2 (geometry) and Phases 3–5 (label→train→loop) can progress in parallel
-once Phase 1 (the spine) exists.
-```
+
+Phases 1 and 2 are independent and can progress in parallel.

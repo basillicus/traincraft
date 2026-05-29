@@ -19,12 +19,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mace = ["mace-torch", "torch"]
-geometry = ["rdkit", "pymatgen", "pysoftk", "MDAnalysis", "mdapackmol-fmt"]
+# Install individually: pip install -e ".[mace]", pip install -e ".[sampling]", etc.
+mace        = ["mace-torch", "torch"]
+geometry    = ["rdkit", "pymatgen", "MDAnalysis", "mdapackmol-fmt"]
+pysoftk     = ["pysoftk"]          # separate: polymer builder; install from PyPI/GitHub
 descriptors = ["dscribe"]
-sampling = ["hiphive"]
+sampling    = ["hiphive"]
 semiempirical = ["tblite"]
-dev = ["pytest>=7", "ruff>=0.5", "mypy>=1.8"]
+dev         = ["pytest>=7", "ruff>=0.5", "mypy>=1.8"]
 
 [project.scripts]
 traincraft = "traincraft.cli:app"
@@ -37,69 +39,93 @@ where = ["src"]
 
 # ---------------------------------------------------------------------------
 # Pixi: primary environment manager (mixes conda-forge + PyPI in one lockfile).
-# conda-forge provides packmol / hiphive / DFT tooling; PyPI provides the rest.
+# conda-forge provides packmol / hiphive / tblite / DFT tooling.
+# PyPI provides mace-torch, mdapackmol-fmt, dscribe, etc.
+#
+# Usage:
+#   pixi install               # default env (core deps only)
+#   pixi install -e dev        # + pytest / ruff / mypy
+#   pixi install -e science    # + sampling + semiempirical + descriptors
+#   pixi install -e mace       # + mace-torch (needs CUDA/CPU torch)
+#   pixi run test              # run tests inside the dev env
+#   pixi run -e science slice  # run the walking-skeleton example
 # ---------------------------------------------------------------------------
-[tool.pixi.project]
-channels = ["conda-forge"]
+[tool.pixi.workspace]
+channels  = ["conda-forge"]
 platforms = ["linux-64"]
 
+# Core deps (present in every environment) --------------------------------
 [tool.pixi.dependencies]
-python = ">=3.10"
-ase = ">=3.22"
-numpy = ">=1.23"
+python   = ">=3.10,<3.13"   # pin below 3.13 for broadest conda-forge coverage
+ase      = ">=3.22"
+numpy    = ">=1.23"
 pydantic = ">=2.5"
-typer = ">=0.12"
-tomlkit = ">=0.12"
+typer    = ">=0.12"
+tomlkit  = ">=0.12"
 
 [tool.pixi.pypi-dependencies]
 traincraft = { path = ".", editable = true }
 
+# dev feature --------------------------------------------------------------
 [tool.pixi.feature.dev.dependencies]
 pytest = ">=7"
-ruff = ">=0.5"
-mypy = ">=1.8"
+ruff   = ">=0.5"
+mypy   = ">=1.8"
 
+# sampling feature (HiPhive rattle) ----------------------------------------
 [tool.pixi.feature.sampling.dependencies]
 hiphive = "*"
 
+# semiempirical feature (tblite / GFN-xTB) ---------------------------------
+[tool.pixi.feature.semiempirical.dependencies]
+tblite        = "*"
+tblite-python = "*"
+
+# geometry feature (Packmol + rdkit + pymatgen + MDAnalysis) ---------------
 [tool.pixi.feature.geometry.dependencies]
-packmol = "*"
-rdkit = "*"
-pymatgen = "*"
+packmol    = "*"
+rdkit      = "*"
+pymatgen   = "*"
 mdanalysis = "*"
 
 [tool.pixi.feature.geometry.pypi-dependencies]
-pysoftk = "*"
 mdapackmol-fmt = "*"
+# pysoftk is listed separately; install manually if needed:
+#   pixi run pip install pysoftk
+# (not in PyPI index resolution until package name is confirmed)
 
-[tool.pixi.feature.semiempirical.dependencies]
-tblite = "*"
-tblite-python = "*"
-
-[tool.pixi.feature.mace.pypi-dependencies]
-mace-torch = "*"
-torch = "*"
-
+# descriptors feature (SOAP / ACE for near-dup selection) ------------------
 [tool.pixi.feature.descriptors.pypi-dependencies]
 dscribe = "*"
 
+# mace feature (heavy: requires torch) ------------------------------------
+# Not included in 'science' by default; activate explicitly:
+#   pixi install -e mace
+[tool.pixi.feature.mace.pypi-dependencies]
+mace-torch = "*"
+torch      = "*"
+
+# Environments -------------------------------------------------------------
 [tool.pixi.environments]
 default = { solve-group = "default" }
-dev = { features = ["dev"], solve-group = "default" }
-full = { features = ["dev", "sampling", "geometry", "semiempirical", "descriptors"] }
+dev     = { features = ["dev"],                                    solve-group = "default" }
+science = { features = ["dev", "sampling", "semiempirical", "geometry", "descriptors"] }
+mace    = { features = ["dev", "mace"] }
 
+# Tasks --------------------------------------------------------------------
 [tool.pixi.tasks]
-test = "pytest -q"
-lint = "ruff check ."
-slice = "traincraft run examples/walking_skeleton.toml"
+test  = { cmd = "pytest -q",                                    description = "Run the test suite" }
+lint  = { cmd = "ruff check .",                                 description = "Lint with ruff" }
+fmt   = { cmd = "ruff format .",                                description = "Format with ruff" }
+slice = { cmd = "traincraft run examples/01_cnt_emt_md.toml",   description = "Run the walking-skeleton example" }
 
 # ---------------------------------------------------------------------------
-# Tooling
+# Tooling config
 # ---------------------------------------------------------------------------
 [tool.ruff]
-line-length = 100
+line-length    = 100
 target-version = "py310"
-src = ["src", "tests"]
+src            = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
@@ -110,8 +136,8 @@ select = ["E", "F", "I", "UP", "B", "W"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts   = "-q"
 
 [tool.mypy]
-python_version = "3.10"
+python_version      = "3.10"
 ignore_missing_imports = true

@@ -1,0 +1,39 @@
+# Example 03 — Load geometry from an existing file (any ASE-readable format)
+#
+# Run with:  traincraft run examples/03_molecule_from_file.toml
+#
+# What it does:
+#   1. Reads a geometry from a local .xyz / .extxyz / .cif / .pdb / ... file.
+#   2. Applies a vacuum transform (useful if the file has no cell).
+#   3. Runs a short MD and filters the results.
+#
+# Change 'path' to point at any ASE-readable structure file on your system.
+
+[run]
+name   = "03_from_file"
+outdir = "runs"
+seed   = 0
+
+[geometry.source]
+type = "file"
+path = "examples/assets/h2o.xyz"   # replace with your file
+
+[[geometry.transforms]]
+type   = "vacuum"
+amount = 10.0      # Å
+
+[calculator]
+type = "emt"
+
+[sampling]
+type        = "md"
+temperature = 200.0
+steps       = 30
+interval    = 10
+
+[selection]
+steps  = ["physicality", "dedup"]
+budget = 3
+
+[dataset]
+path = "dataset"

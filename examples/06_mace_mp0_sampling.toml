@@ -1,0 +1,47 @@
+# Example 06 — MACE-MP0 foundation model for sampling
+#
+# Requires:  pixi install -e mace   (installs torch + mace-torch)
+# Run with:  traincraft run examples/06_mace_mp0_sampling.toml
+#
+# What it does:
+#   1. Builds a bulk Cu crystal (FCC, ASE built-in).
+#   2. Uses MACE-MP0 ("large", CPU) to drive Langevin MD — an accurate MLIP
+#      for periodic systems covering elements 1-89.
+#   3. Filters and writes 5 diverse labeled frames.
+#
+# For GPU acceleration, change device = "cuda".
+# For a local fine-tuned model, set model_path = "/path/to/your.model".
+
+[run]
+name   = "06_mace_mp0"
+outdir = "runs"
+seed   = 42
+
+[geometry.source]
+type = "scratch"
+bulk = "Cu"         # ase.build.bulk("Cu") — FCC crystal
+
+[[geometry.transforms]]
+type   = "supercell"
+repeat = [2, 2, 2]
+
+[calculator]
+type         = "mace"
+model        = "mace-mp0"   # downloads ~50 MB model on first run
+device       = "cpu"        # or "cuda"
+default_dtype = "float32"
+# model_path = "/path/to/local/fine-tuned.model"   # uncomment to use your own
+
+[sampling]
+type        = "md"
+temperature = 500.0
+steps       = 200
+interval    = 20
+
+[selection]
+steps        = ["physicality", "dedup", "diversity"]
+budget       = 5
+min_distance = 1.5    # tighter for a crystal (shorter bonds)
+
+[dataset]
+path = "dataset"
