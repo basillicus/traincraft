@@ -1,7 +1,12 @@
 # Example 02 — CO2 molecule, EMT calculator, HiPhive rattle sampling
 #
 # Requires:  pixi install -e science   (or: pip install hiphive)
-# Run with:  traincraft run examples/02_molecule_emt_rattle.toml
+#
+# Run from the repo root:
+#   pixi run -e science example-02
+# Or activate the shell first and then run from anywhere:
+#   pixi shell -e science          # activates the env
+#   traincraft run examples/02_molecule_emt_rattle.toml
 #
 # What it does:
 #   1. Builds a CO2 molecule with 8 Å vacuum.

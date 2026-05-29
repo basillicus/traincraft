@@ -73,7 +73,8 @@ ruff   = ">=0.5"
 mypy   = ">=1.8"
 
 # sampling feature (HiPhive rattle) ----------------------------------------
-[tool.pixi.feature.sampling.dependencies]
+# hiphive is on conda-forge only up to Python 3.11; use PyPI for 3.12+.
+[tool.pixi.feature.sampling.pypi-dependencies]
 hiphive = "*"
 
 # semiempirical feature (tblite / GFN-xTB) ---------------------------------
@@ -113,11 +114,21 @@ science = { features = ["dev", "sampling", "semiempirical", "geometry", "descrip
 mace    = { features = ["dev", "mace"] }
 
 # Tasks --------------------------------------------------------------------
+# Run these from the repo root.  Use -e <env> to pick the environment:
+#   pixi run test                        # uses 'default' env
+#   pixi run -e dev test                 # uses 'dev' env
+#   pixi run -e science example-02       # needs science env (hiphive / tblite)
+#   pixi run -e mace example-06          # needs mace env (torch + mace-torch)
 [tool.pixi.tasks]
-test  = { cmd = "pytest -q",                                    description = "Run the test suite" }
-lint  = { cmd = "ruff check .",                                 description = "Lint with ruff" }
-fmt   = { cmd = "ruff format .",                                description = "Format with ruff" }
-slice = { cmd = "traincraft run examples/01_cnt_emt_md.toml",   description = "Run the walking-skeleton example" }
+test       = { cmd = "pytest -q",                                           description = "Run the test suite" }
+lint       = { cmd = "ruff check .",                                        description = "Lint with ruff" }
+fmt        = { cmd = "ruff format .",                                       description = "Format with ruff" }
+example-01 = { cmd = "traincraft run examples/01_cnt_emt_md.toml",         description = "CNT + EMT + MD (no extra deps)" }
+example-02 = { cmd = "traincraft run examples/02_molecule_emt_rattle.toml",description = "Molecule + rattle (needs science env)" }
+example-03 = { cmd = "traincraft run examples/03_molecule_from_file.toml", description = "Load from file + MD (no extra deps)" }
+example-04 = { cmd = "traincraft run examples/04_nanotube_supercell_rattle.toml", description = "Supercell + rattle (needs science env)" }
+example-05 = { cmd = "traincraft run examples/05_selection_funnel_demo.toml", description = "Funnel demo (no extra deps)" }
+example-06 = { cmd = "traincraft run examples/06_mace_mp0_sampling.toml",  description = "MACE-MP0 sampling (needs mace env)" }
 
 # ---------------------------------------------------------------------------
 # Tooling config

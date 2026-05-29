@@ -1,7 +1,12 @@
 # Example 06 — MACE-MP0 foundation model for sampling
 #
 # Requires:  pixi install -e mace   (installs torch + mace-torch)
-# Run with:  traincraft run examples/06_mace_mp0_sampling.toml
+#
+# Run from the repo root:
+#   pixi run -e mace example-06
+# Or activate the shell first:
+#   pixi shell -e mace
+#   traincraft run examples/06_mace_mp0_sampling.toml
 #
 # What it does:
 #   1. Builds a bulk Cu crystal (FCC, ASE built-in).

@@ -1,7 +1,12 @@
 # Example 04 — Nanotube supercell + rattle + aggressive diversity filtering
 #
 # Requires:  pixi install -e science   (or: pip install hiphive)
-# Run with:  traincraft run examples/04_nanotube_supercell_rattle.toml
+#
+# Run from the repo root:
+#   pixi run -e science example-04
+# Or activate the shell first:
+#   pixi shell -e science
+#   traincraft run examples/04_nanotube_supercell_rattle.toml
 #
 # What it does:
 #   1. Builds an (8,0) CNT (1 unit cell).

@@ -15,43 +15,56 @@ only spends expensive DFT on structures that actually improve the model.
 
 ### 1 — Install
 
-**With pixi (recommended — handles conda + pip together):**
+**With pixi (recommended — mixes conda-forge and PyPI in one lockfile):**
 
 ```bash
-# Clone and enter the repo
-git clone <repo>
-cd traincraft
+git clone <repo> && cd traincraft
 
-# Core env (ASE, pydantic, typer — all that example 01–05 need):
-pixi install
-
-# Dev env (adds pytest + ruff):
-pixi install -e dev
-
-# Science env (adds HiPhive rattle, tblite, geometry tools, descriptors):
-pixi install -e science
-
-# MACE env (adds torch + mace-torch — heavy, downloads ~50 MB model on first run):
-pixi install -e mace
+pixi install           # default env: core deps only (ASE, pydantic, typer)
+pixi install -e dev    # + pytest, ruff, mypy
+pixi install -e science  # + HiPhive rattle, tblite/GFN-xTB, geometry tools, dscribe
+pixi install -e mace   # + torch + mace-torch (heavy; downloads model on first run)
 ```
 
-**With pip (no conda; works for pure-Python usage):**
+**With pip/uv (pure-Python, no conda):**
 
 ```bash
-pip install -e ".[dev]"               # core + dev tools
-pip install -e ".[dev,sampling]"      # + HiPhive rattle
-pip install -e ".[dev,semiempirical]" # + tblite/GFN-xTB
-pip install -e ".[dev,mace]"          # + MACE + torch
+uv pip install -e ".[dev]"               # core + dev tools
+uv pip install -e ".[dev,sampling]"      # + HiPhive rattle
+uv pip install -e ".[dev,semiempirical]" # + tblite/GFN-xTB
+uv pip install -e ".[dev,mace]"          # + MACE + torch
 ```
 
 ### 2 — Run your first example
 
-```bash
-# No heavy deps needed — uses ASE EMT force field:
-pixi run -e dev traincraft run examples/01_cnt_emt_md.toml
+**Important: always run examples via pixi to ensure the right environment is used.**
 
-# Or with pip install:
-traincraft run examples/01_cnt_emt_md.toml
+```bash
+# No heavy deps — uses ASE EMT force field (works in any env):
+pixi run example-01                     # from the repo root
+
+# Or equivalently:
+pixi run -e dev traincraft run examples/01_cnt_emt_md.toml
+```
+
+> **Why `pixi run` and not bare `traincraft`?**  
+> `pixi run` executes the command inside the pixi-managed environment. If you
+> run `traincraft` directly from a shell that isn't inside a pixi env, the
+> right packages (e.g. hiphive, tblite, mace-torch) may not be on the Python
+> path even if `pixi install -e science` has been run.  
+> Use `pixi shell -e science` to enter the environment interactively, then
+> bare `traincraft` commands work as expected.
+
+Examples that need optional dependencies:
+
+```bash
+# HiPhive rattle — install the science env first:
+pixi install -e science
+pixi run -e science example-02
+
+# MACE-MP0 sampling — install the mace env first:
+pixi install -e mace
+pixi run -e mace example-06
 ```
 
 This builds a (5,0) carbon nanotube, runs 50 steps of Langevin MD, filters
