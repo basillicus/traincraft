@@ -84,6 +84,7 @@ def build_surface_adsorbate(cfg) -> Structure:
     if cfg.offset is not None:
         kwargs["offset"] = cfg.offset
     add_adsorbate(slab, ads, **kwargs)
+    slab.info.pop("adsorbate_info", None)  # not extxyz-serialisable
 
     # Fragment tagging: substrate=-1, adsorbate=0
     frag = np.full(n_slab + n_ads, -1, dtype=int)

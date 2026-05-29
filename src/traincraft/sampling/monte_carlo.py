@@ -100,10 +100,15 @@ def _move_conformer(
     new_centroid = new_pos.mean(axis=0)
     new_pos = new_pos - new_centroid + old_centroid
 
-    # Align principal axes via SVD.
-    _, _, vh_old = np.linalg.svd((old_pos - old_centroid).T)
-    _, _, vh_new = np.linalg.svd((new_pos - old_centroid).T)
+    # Align principal axes via SVD (Kabsch-style).
+    # Input shape (n_atoms, 3); full_matrices=False gives vh shape (3, 3).
+    _, _, vh_old = np.linalg.svd(old_pos - old_centroid, full_matrices=False)
+    _, _, vh_new = np.linalg.svd(new_pos - old_centroid, full_matrices=False)
     rot = vh_old.T @ vh_new
+    # Ensure proper rotation (det=+1), not a reflection.
+    if np.linalg.det(rot) < 0:
+        vh_new[-1] *= -1
+        rot = vh_old.T @ vh_new
     new_pos = (rot @ (new_pos - old_centroid).T).T + old_centroid
 
     pos = atoms.get_positions()
