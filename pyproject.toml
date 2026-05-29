@@ -1,25 +1,117 @@
 [build-system]
-
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
-
-[tool.setuptools]
-
-package-dir = {"" = "src"}
-
-
-[tool.setuptools.packages.find]
-
-where = ["src"]
-
-
 [project]
-
 name = "traincraft"
-version = "0.0.1"
+version = "0.1.0"
+description = "Modular generation of training datasets for, and training of, ML interatomic potentials (MACE-centric) with an active-learning loop."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "David Abbasi Perez" }]
+dependencies = [
+    "ase>=3.22",
+    "numpy>=1.23",
+    "pydantic>=2.5",
+    "typer>=0.12",
+    "tomlkit>=0.12",
+]
 
+[project.optional-dependencies]
+mace = ["mace-torch", "torch"]
+geometry = ["rdkit", "pymatgen", "pysoftk", "MDAnalysis", "mdapackmol-fmt"]
+descriptors = ["dscribe"]
+sampling = ["hiphive"]
+semiempirical = ["tblite"]
+dev = ["pytest>=7", "ruff>=0.5", "mypy>=1.8"]
 
 [project.scripts]
+traincraft = "traincraft.cli:app"
 
-traincraft = "traincraft.__main__:main"
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ---------------------------------------------------------------------------
+# Pixi: primary environment manager (mixes conda-forge + PyPI in one lockfile).
+# conda-forge provides packmol / hiphive / DFT tooling; PyPI provides the rest.
+# ---------------------------------------------------------------------------
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.10"
+ase = ">=3.22"
+numpy = ">=1.23"
+pydantic = ">=2.5"
+typer = ">=0.12"
+tomlkit = ">=0.12"
+
+[tool.pixi.pypi-dependencies]
+traincraft = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.dependencies]
+pytest = ">=7"
+ruff = ">=0.5"
+mypy = ">=1.8"
+
+[tool.pixi.feature.sampling.dependencies]
+hiphive = "*"
+
+[tool.pixi.feature.geometry.dependencies]
+packmol = "*"
+rdkit = "*"
+pymatgen = "*"
+mdanalysis = "*"
+
+[tool.pixi.feature.geometry.pypi-dependencies]
+pysoftk = "*"
+mdapackmol-fmt = "*"
+
+[tool.pixi.feature.semiempirical.dependencies]
+tblite = "*"
+tblite-python = "*"
+
+[tool.pixi.feature.mace.pypi-dependencies]
+mace-torch = "*"
+torch = "*"
+
+[tool.pixi.feature.descriptors.pypi-dependencies]
+dscribe = "*"
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+full = { features = ["dev", "sampling", "geometry", "semiempirical", "descriptors"] }
+
+[tool.pixi.tasks]
+test = "pytest -q"
+lint = "ruff check ."
+slice = "traincraft run examples/walking_skeleton.toml"
+
+# ---------------------------------------------------------------------------
+# Tooling
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# Typer's documented idiom puts Argument()/Option() in parameter defaults.
+"src/traincraft/cli.py" = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true

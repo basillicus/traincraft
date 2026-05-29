@@ -1,0 +1,39 @@
+# Walking-skeleton workflow: the whole pipeline in one TOML.
+# Runs with zero heavy dependencies (ASE EMT), so it works out of the box.
+#
+#   traincraft run examples/walking_skeleton.toml
+
+[run]
+name = "skeleton_cnt"
+outdir = "runs"
+seed = 42
+
+# --- build a small carbon nanotube --------------------------------------
+[geometry.builder]
+type = "nanotube"
+n = 5
+m = 0
+length = 1
+vacuum = 6.0
+
+# --- cheap calculator for exploration -----------------------------------
+[calculator]
+type = "emt"           # or: tblite / xtb / mace
+
+# --- generate candidate frames via short MD -----------------------------
+[sampling]
+type = "md"            # or: rattle / monte_carlo
+temperature = 300.0
+steps = 50
+interval = 10
+timestep = 1.0
+
+# --- selection funnel (cheap filtering before any DFT) -------------------
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 3
+min_distance = 0.7
+
+# --- where the (currently unlabeled) frames are collected ---------------
+[dataset]
+path = "dataset"

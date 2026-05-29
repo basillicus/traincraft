@@ -50,6 +50,19 @@ Thumbs.db
 
 # Local
 testing/
-tests/
 .pylintrc
 NOTEs
+
+# TrainCraft run outputs
+runs/
+
+# Pixi
+.pixi/
+
+# Python build/test caches
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+__pycache__/
