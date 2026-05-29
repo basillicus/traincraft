@@ -67,3 +67,76 @@ def test_absolute_file_source_path_unchanged(tmp_path):
 
     cfg = load_config(config_file)
     assert Path(cfg.geometry.source.path) == asset
+
+
+# --- new Phase 1 models -------------------------------------------------------
+
+def test_smiles_source_validates():
+    cfg = loads_config('[geometry.source]\ntype = "smiles"\nsmiles = "CCO"\n')
+    assert cfg.geometry.source.type == "smiles"
+    assert cfg.geometry.source.smiles == "CCO"
+
+
+def test_surface_adsorbate_builder_validates():
+    toml = (
+        '[geometry.builder]\ntype = "surface_adsorbate"\nelement = "Cu"\n'
+        'molecule_name = "CO"\n'
+    )
+    cfg = loads_config(toml)
+    assert cfg.geometry.builder.type == "surface_adsorbate"
+    assert cfg.geometry.builder.element == "Cu"
+
+
+def test_surface_adsorbate_builder_needs_one_adsorbate():
+    with pytest.raises(ValidationError):
+        loads_config(
+            '[geometry.builder]\ntype = "surface_adsorbate"\nelement = "Cu"\n'
+            'molecule_name = "CO"\nsmiles = "CO"\n'
+        )
+
+
+def test_surface_adsorbate_builder_needs_at_least_one_adsorbate():
+    with pytest.raises(ValidationError):
+        loads_config(
+            '[geometry.builder]\ntype = "surface_adsorbate"\nelement = "Cu"\n'
+        )
+
+
+def test_surface_packing_builder_validates():
+    toml = (
+        '[geometry.builder]\ntype = "surface_packing"\nelement = "Cu"\n'
+        'molecule_name = "CO2"\nn_molecules = 3\n'
+    )
+    cfg = loads_config(toml)
+    assert cfg.geometry.builder.n_molecules == 3
+
+
+def test_monte_carlo_sampling_validates():
+    cfg = loads_config('[sampling]\ntype = "monte_carlo"\nsteps = 200\n')
+    s = cfg.sampling
+    assert s.type == "monte_carlo"
+    assert s.p_translate + s.p_rotate + s.p_conformer > 0
+
+
+def test_monte_carlo_all_zero_probabilities_rejected():
+    with pytest.raises(ValidationError):
+        loads_config(
+            '[sampling]\ntype = "monte_carlo"\n'
+            'p_translate = 0.0\np_rotate = 0.0\np_conformer = 0.0\n'
+        )
+
+
+def test_builder_file_resolved_relative_to_config(tmp_path):
+    asset = tmp_path / "ads.xyz"
+    asset.write_text("1\ntest\nC 0 0 0\n")
+
+    toml = (
+        '[geometry.builder]\ntype = "surface_adsorbate"\nelement = "Cu"\n'
+        'file = "ads.xyz"\n'
+    )
+    config_file = tmp_path / "run.toml"
+    config_file.write_text(toml)
+
+    cfg = load_config(config_file)
+    assert Path(cfg.geometry.builder.file).is_absolute()
+    assert Path(cfg.geometry.builder.file) == asset

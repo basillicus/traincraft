@@ -35,7 +35,18 @@ class ScratchSource(TCModel):
     bulk: str | None = None  # ase.build.bulk symbol (e.g. "Cu")
 
 
-SourceConfig = Annotated[FileSource | ScratchSource, Field(discriminator="type")]
+class SmilesSource(TCModel):
+    type: Literal["smiles"] = "smiles"
+    smiles: str
+    n_conformers: int = 1
+    optimize: bool = True
+    seed: int | None = None
+    vacuum: float = 6.0
+
+
+SourceConfig = Annotated[
+    FileSource | ScratchSource | SmilesSource, Field(discriminator="type")
+]
 
 
 # ----------------------------------------------------------------------- builders
@@ -61,8 +72,65 @@ class MoleculeBuilder(TCModel):
         return self
 
 
+_FACETS = Literal["fcc111", "fcc100", "fcc110", "bcc110", "bcc100", "hcp0001"]
+
+
+class SurfaceAdsorbateBuilder(TCModel):
+    type: Literal["surface_adsorbate"] = "surface_adsorbate"
+    # substrate
+    element: str
+    facet: _FACETS = "fcc111"
+    size: tuple[int, int, int] = (3, 3, 4)
+    vacuum: float = 12.0
+    # adsorbate: exactly one of molecule_name | smiles | file
+    molecule_name: str | None = None  # ase.build.molecule g2 name
+    smiles: str | None = None
+    file: str | None = None  # path resolved relative to config file
+    # placement
+    site: Literal["ontop", "bridge", "hollow", "fcc", "hcp"] = "ontop"
+    height: float = 2.0
+    offset: tuple[float, float] | None = None
+
+    @model_validator(mode="after")
+    def _one_adsorbate(self) -> SurfaceAdsorbateBuilder:
+        n = sum(x is not None for x in (self.molecule_name, self.smiles, self.file))
+        if n != 1:
+            raise ValueError(
+                "surface_adsorbate needs exactly one of 'molecule_name', 'smiles', or 'file'"
+            )
+        return self
+
+
+class SurfacePackingBuilder(TCModel):
+    type: Literal["surface_packing"] = "surface_packing"
+    element: str
+    facet: _FACETS = "fcc111"
+    size: tuple[int, int, int] = (4, 4, 4)
+    vacuum: float = 20.0
+    # adsorbate molecules to pack above the slab: exactly one
+    molecule_name: str | None = None
+    smiles: str | None = None
+    file: str | None = None
+    # packing parameters
+    n_molecules: int = 4
+    tolerance: float = 2.0
+    region_height: float = 8.0
+    gap: float = 2.0
+    seed: int | None = None
+
+    @model_validator(mode="after")
+    def _one_adsorbate(self) -> SurfacePackingBuilder:
+        n = sum(x is not None for x in (self.molecule_name, self.smiles, self.file))
+        if n != 1:
+            raise ValueError(
+                "surface_packing needs exactly one of 'molecule_name', 'smiles', or 'file'"
+            )
+        return self
+
+
 BuilderConfig = Annotated[
-    NanotubeBuilder | MoleculeBuilder, Field(discriminator="type")
+    NanotubeBuilder | MoleculeBuilder | SurfaceAdsorbateBuilder | SurfacePackingBuilder,
+    Field(discriminator="type"),
 ]
 
 
@@ -151,7 +219,21 @@ class MonteCarloSampling(TCModel):
     type: Literal["monte_carlo"] = "monte_carlo"
     steps: int = 1000
     temperature: float = 500.0
-    conformers: bool = False  # RDKit conformer moves (next chunk)
+    interval: int = 20
+    p_translate: float = 0.5
+    p_rotate: float = 0.4
+    p_conformer: float = 0.1
+    max_translate: float = 0.5  # Å
+    max_rotate: float = 30.0    # degrees
+    refresh_fragments: bool = False
+    refresh_scale: float = 1.2
+    seed: int | None = None
+
+    @model_validator(mode="after")
+    def _moves_nonzero(self) -> MonteCarloSampling:
+        if self.p_translate + self.p_rotate + self.p_conformer <= 0:
+            raise ValueError("monte_carlo needs at least one move probability > 0")
+        return self
 
 
 SamplingConfig = Annotated[

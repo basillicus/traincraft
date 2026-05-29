@@ -36,16 +36,29 @@ def loads_config(text: str) -> TrainCraftConfig:
 
 def _resolve_input_paths(cfg: TrainCraftConfig, base: Path) -> TrainCraftConfig:
     """Resolve relative input file paths against *base* (the config file's dir)."""
-    if cfg.geometry is None or cfg.geometry.source is None:
+    if cfg.geometry is None:
         return cfg
-    src = cfg.geometry.source
-    if not hasattr(src, "path"):
+
+    updates: dict = {}
+
+    # source.path (e.g. FileSource)
+    if cfg.geometry.source is not None and hasattr(cfg.geometry.source, "path"):
+        src = cfg.geometry.source
+        p = Path(src.path)
+        if not p.is_absolute():
+            updates["source"] = src.model_copy(update={"path": str(base / p)})
+
+    # builder.file (e.g. SurfaceAdsorbateBuilder, SurfacePackingBuilder)
+    if cfg.geometry.builder is not None and hasattr(cfg.geometry.builder, "file"):
+        builder = cfg.geometry.builder
+        if builder.file is not None:
+            p = Path(builder.file)
+            if not p.is_absolute():
+                updates["builder"] = builder.model_copy(update={"file": str(base / p)})
+
+    if not updates:
         return cfg
-    p = Path(src.path)
-    if p.is_absolute():
-        return cfg
-    new_src = src.model_copy(update={"path": str(base / p)})
-    new_geom = cfg.geometry.model_copy(update={"source": new_src})
+    new_geom = cfg.geometry.model_copy(update=updates)
     return cfg.model_copy(update={"geometry": new_geom})
 
 
