@@ -63,6 +63,24 @@ class Structure:
             provenance=Provenance.from_dict(self.provenance.to_dict()),
         )
 
+    # --- fragment identity helpers ----------------------------------------
+    @property
+    def fragments(self):
+        """Per-atom fragment array, or None if unset."""
+        from .fragments import get_fragments
+        return get_fragments(self.atoms)
+
+    def set_fragments(self, frag) -> None:
+        """Attach/overwrite the per-atom fragment array."""
+        from .fragments import set_fragments
+        set_fragments(self.atoms, frag)
+
+    @property
+    def n_fragments(self) -> int:
+        """Number of distinct mobile fragments (excludes framework atoms)."""
+        from .fragments import fragment_ids
+        return len(fragment_ids(self.atoms))
+
     # --- interop stubs (implemented in the geometry chunk) -----------------
     def to_pymatgen(self):  # pragma: no cover - Phase 2
         raise NotImplementedError("pymatgen interop lands with the geometry chunk")
