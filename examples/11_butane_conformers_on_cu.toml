@@ -1,0 +1,78 @@
+# Example 11 — Butane conformers on Cu(111): gauche vs. anti landscape
+#
+# WHY THIS EXAMPLE EXISTS
+# -----------------------
+# Butane (CCCC) is the textbook conformer example:
+#   anti   (C-C-C-C dihedral ~180°) — global minimum in gas phase
+#   gauche (C-C-C-C dihedral ~60°)  — ~3.8 kJ/mol higher in gas phase
+# On a metal surface the energy ordering can flip depending on the
+# adsorbate–surface interaction.  Raman spectra of the two conformers
+# differ substantially in the 800–1100 cm⁻¹ region (C-C stretch region).
+#
+# This example pairs a larger MC run (more steps, more conformer moves)
+# with surface_packing to start from multiple butane molecules so that
+# the final dataset contains a mix of coverages and conformers.
+#
+# TWO-STAGE WORKFLOW
+# ------------------
+# The 'surface_packing' builder (Packmol) places 3 butane molecules above
+# the slab in random orientations.  The MC sampler then explores each
+# molecule's conformational freedom independently (each is a separate
+# fragment: 0, 1, 2).  At every conformer move, an independent fresh ETKDG
+# conformer is drawn for the target fragment — the other two molecules are
+# unaffected.
+#
+# MONITORING CONFORMERS IN THE OUTPUT
+# ------------------------------------
+# Load the dataset and inspect the C-C-C-C dihedral per frame:
+#
+#   from traincraft.datasets.io import read_frames
+#   from ase.geometry.analysis import Analysis
+#   frames = read_frames("runs/11_butane.../dataset.extxyz")
+#   for f in frames:
+#       an = Analysis(f.atoms)
+#       print(an.get_dihedrals("C", "C", "C", "C"))
+#
+# Requires the science environment (rdkit + packmol):
+#   pixi install -e science
+#   pixi run -e science example-11
+
+[run]
+name   = "11_butane_conformers_cu111"
+outdir = "runs"
+seed   = 99
+
+[geometry.builder]
+type          = "surface_packing"
+element       = "Cu"
+facet         = "fcc111"
+size          = [4, 4, 4]
+vacuum        = 20.0
+smiles        = "CCCC"       # butane — SMILES required for conformer moves
+n_molecules   = 3
+tolerance     = 2.0
+region_height = 8.0
+gap           = 2.0
+seed          = 5
+
+[calculator]
+type = "emt"                 # swap for tblite or mace for real energetics
+
+[sampling]
+type          = "monte_carlo"
+steps         = 300
+interval      = 30           # 10 recorded frames
+temperature   = 500.0        # K — higher T to overcome conformer barriers
+p_translate   = 0.25
+p_rotate      = 0.25
+p_conformer   = 0.50         # 50% conformer moves — this is the point of the example
+max_translate = 0.5          # Å
+max_rotate    = 30.0         # degrees
+seed          = 7
+
+[selection]
+steps  = ["physicality", "dedup", "diversity"]
+budget = 6
+
+[dataset]
+path = "dataset"

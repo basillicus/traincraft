@@ -109,6 +109,8 @@ traincraft plugins                                # list all registered plugins
 | [`07_co_on_cu_mc.toml`](examples/07_co_on_cu_mc.toml) | CO on Cu(111) + Metropolis MC | none |
 | [`08_smiles_molecule.toml`](examples/08_smiles_molecule.toml) | Molecule from SMILES + MD | `science` |
 | [`09_packing_on_surface.toml`](examples/09_packing_on_surface.toml) | Packmol surface coverage + MC | `science` |
+| [`10_ethanol_conformers_on_cu.toml`](examples/10_ethanol_conformers_on_cu.toml) | Ethanol gauche/anti conformers on Cu(111) | `science` |
+| [`11_butane_conformers_on_cu.toml`](examples/11_butane_conformers_on_cu.toml) | Butane conformer landscape, 3-molecule coverage | `science` |
 
 ---
 

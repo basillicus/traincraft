@@ -1,0 +1,66 @@
+# Example 10 — Ethanol conformers on Cu(111) via Metropolis MC
+#
+# WHY THIS EXAMPLE EXISTS
+# -----------------------
+# Ethanol (CCO) has two relevant conformers around the C-C bond:
+#   gauche  (OCCH dihedral ~60°)  — dipole moment ~1.7 D
+#   anti    (OCCH dihedral ~180°) — dipole moment ~1.4 D
+# The conformer that actually adsorbs determines the IR/Raman spectrum.
+# MC with conformer moves (ETKDG) explores the conformational landscape
+# *on the surface* rather than sampling it in the gas phase first — the two
+# processes give different populations because the surface stabilises one
+# conformer via adsorbate–surface electrostatics.
+#
+# KEY RULE: adsorbate MUST be given as 'smiles', not 'molecule_name'.
+# The canonical SMILES is stored in provenance.extra["fragment_smiles"] so
+# each conformer move can regenerate a fresh ETKDG geometry.  If you use
+# 'molecule_name = "CH3CH2OH"' the conformer move is silently disabled and
+# only translate/rotate moves run.
+#
+# MOVE MIX
+# --------
+# p_translate  0.3  — small lateral/vertical displacements
+# p_rotate     0.3  — random rotation about the molecular centroid
+# p_conformer  0.4  — 40% of steps attempt a fresh ETKDG conformer aligned
+#                     to the current binding geometry (centroid + PCA axes)
+#
+# Requires the science environment (rdkit):
+#   pixi install -e science
+#   pixi run -e science example-10
+
+[run]
+name   = "10_ethanol_conformers_cu111"
+outdir = "runs"
+seed   = 17
+
+[geometry.builder]
+type    = "surface_adsorbate"
+element = "Cu"
+facet   = "fcc111"
+size    = [3, 3, 4]
+vacuum  = 14.0
+smiles  = "CCO"          # ethanol — SMILES required for conformer moves
+site    = "ontop"
+height  = 2.2
+
+[calculator]
+type = "emt"             # swap for tblite or mace for real energetics
+
+[sampling]
+type          = "monte_carlo"
+steps         = 200
+interval      = 20        # record a frame every 20 steps → 10 frames total
+temperature   = 400.0     # K — moderate T to explore conformers
+p_translate   = 0.3
+p_rotate      = 0.3
+p_conformer   = 0.4       # 40% conformer moves
+max_translate = 0.4       # Å
+max_rotate    = 25.0      # degrees
+seed          = 0
+
+[selection]
+steps  = ["physicality", "dedup", "diversity"]
+budget = 5
+
+[dataset]
+path = "dataset"
