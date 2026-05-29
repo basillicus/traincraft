@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_walking_skeleton(tmp_path):
-    cfg = load_config(ROOT / "examples" / "walking_skeleton.toml")
+    cfg = load_config(ROOT / "examples" / "01_cnt_emt_md.toml")
     cfg.run.outdir = str(tmp_path)
     summary = run_pipeline(cfg)
 
