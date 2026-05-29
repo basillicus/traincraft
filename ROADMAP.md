@@ -38,25 +38,37 @@ Delivered
 
 ## Phase 1 — Geometry breadth  *(next)*
 
-**Goal:** generate all the system types that matter scientifically.
+**Goal:** generate all the system types that matter scientifically. Delivered in
+chunks so each is independently testable and reviewable.
 
-Deliverables (incremental; each with a test and an example)
+### Chunk 1 — Molecules-on-surfaces + Monte Carlo  *(spec ready)*
+
+Full implementation spec: [`docs/phase1_chunk1_spec.md`](docs/phase1_chunk1_spec.md).
+Designs the hard abstraction (**fragment identity**, per-atom `tc_fragment` array +
+runtime `infer_fragments` for reactive runs) first, plus the features that depend
+on it:
+- `core/fragments.py` — fragment-identity layer (the spine of this chunk).
+- Source: `smiles` (RDKit ETKDG + optimize).
+- Builders: `surface_adsorbate` (single adsorbate, `ase.build.add_adsorbate`,
+  zero deps) and `surface_packing` (N-molecule coverage via the Packmol binary).
+- `sampling/monte_carlo.py` — Metropolis MC with rigid-body translate/rotate +
+  RDKit conformer-swap moves; optional `refresh_fragments` for bond-changing runs.
+
+### Later Phase-1 chunks
+
 - `converter.py` — ASE ↔ pymatgen ↔ RDKit bridge.
-- Sources: `smiles` (RDKit ETKDG + optimize), `url` (download → read), providers
-  (Materials Project, OPTIMADE, PubChem).
+- Sources: `url` (download → read), providers (Materials Project, OPTIMADE, PubChem).
 - Builders: bulk crystal + defects (vacancy/substitution/interstitial); surface/
-  slab; layered/2D (stacking, interlayer spacing, twist); intercalation; molecules
-  on surfaces (`ase.build.add_adsorbate` / pymatgen `AdsorbateSiteFinder`);
-  polymers (PySoftK); liquids/mixtures/confined (Packmol).
+  slab; layered/2D (stacking, interlayer spacing, twist); intercalation; polymers
+  (PySoftK); liquids/mixtures/confined bulk (Packmol).
 - Transforms: strain, rotate, set pbc, constraints (index-based reapplication after
   Packmol — fixes the legacy bug at `gengeom.py:155`).
-- `sampling/monte_carlo.py` — Metropolis MC with rigid-body moves + RDKit conformer
-  generation (ETKDG); primary tool for complex molecules on surfaces.
 
 Acceptance
 - Each builder produces a valid `Structure` with correct pbc/cell and provenance.
 - Legacy nanotube+CO2 dataset reproducible via the new geometry path.
-- `examples/10_mol_on_surface.toml` and `examples/11_polymer.toml` work.
+- `examples/07_co_on_cu_mc.toml` (zero deps), `08_smiles_molecule.toml`, and
+  `09_packing_on_surface.toml` work.
 
 ---
 
