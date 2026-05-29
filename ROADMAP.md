@@ -41,7 +41,7 @@ Delivered
 **Goal:** generate all the system types that matter scientifically. Delivered in
 chunks so each is independently testable and reviewable.
 
-### Chunk 1 — Molecules-on-surfaces + Monte Carlo  *(spec ready)*
+### ✅ Chunk 1 — Molecules-on-surfaces + Monte Carlo  *(done)*
 
 Full implementation spec: [`docs/phase1_chunk1_spec.md`](docs/phase1_chunk1_spec.md).
 Designs the hard abstraction (**fragment identity**, per-atom `tc_fragment` array +

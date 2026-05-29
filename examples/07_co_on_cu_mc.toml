@@ -1,0 +1,50 @@
+# Example 07 — CO molecule on Cu(111) surface, explored with Monte Carlo
+#
+# What it shows:
+#   1. surface_adsorbate builder: Cu fcc111 slab + single CO adsorbate.
+#      Fragment tagging is automatic: slab atoms = -1 (frozen), CO atoms = 0 (mobile).
+#   2. Metropolis MC sampler: rigid-body translate + rotate moves.
+#      Substrate atoms never move; only the CO fragment is sampled.
+#   3. Selection funnel and dataset output — same as all other examples.
+#
+# Zero extra dependencies (EMT + ASE only). Run with:
+#   pixi run example-07
+# or:
+#   traincraft run examples/07_co_on_cu_mc.toml
+
+[run]
+name   = "07_co_on_cu_mc"
+outdir = "runs"
+seed   = 42
+
+[geometry.builder]
+type          = "surface_adsorbate"
+element       = "Cu"
+facet         = "fcc111"
+size          = [3, 3, 4]
+vacuum        = 12.0
+molecule_name = "CO"
+site          = "ontop"
+height        = 2.0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type         = "monte_carlo"
+steps        = 100
+interval     = 20
+temperature  = 500.0
+p_translate  = 0.6
+p_rotate     = 0.4
+p_conformer  = 0.0
+max_translate = 0.3
+max_rotate   = 20.0
+seed         = 0
+
+[selection]
+steps  = ["physicality", "dedup", "diversity"]
+budget = 3
+
+[dataset]
+path = "dataset"

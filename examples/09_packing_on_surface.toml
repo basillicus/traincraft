@@ -1,0 +1,49 @@
+# Example 09 — Pack multiple CO2 molecules above a Cu surface, explore with MC
+#
+# What it shows:
+#   1. surface_packing builder: Cu fcc111 slab + 3×CO2 placed by Packmol.
+#      Each CO2 gets a distinct fragment id (0, 1, 2); slab atoms = -1.
+#   2. MC sampler with p_conformer > 0: conformer moves are attempted using the
+#      CO2 SMILES stored in provenance.  Requires rdkit.
+#   3. Full pipeline: selection funnel → dataset.
+#
+# Requires the science environment (rdkit + packmol):
+#   pixi install -e science
+#   pixi run -e science example-09
+
+[run]
+name   = "09_co2_packing_mc"
+outdir = "runs"
+seed   = 3
+
+[geometry.builder]
+type          = "surface_packing"
+element       = "Cu"
+facet         = "fcc111"
+size          = [4, 4, 4]
+vacuum        = 20.0
+molecule_name = "CO2"
+n_molecules   = 3
+tolerance     = 2.0
+region_height = 8.0
+gap           = 2.0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type        = "monte_carlo"
+steps       = 100
+interval    = 20
+temperature = 500.0
+p_translate = 0.45
+p_rotate    = 0.45
+p_conformer = 0.10
+seed        = 0
+
+[selection]
+steps  = ["physicality", "dedup", "diversity"]
+budget = 4
+
+[dataset]
+path = "dataset"

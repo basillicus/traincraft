@@ -129,6 +129,9 @@ example-03 = { cmd = "traincraft run examples/03_molecule_from_file.toml", descr
 example-04 = { cmd = "traincraft run examples/04_nanotube_supercell_rattle.toml", description = "Supercell + rattle (needs science env)" }
 example-05 = { cmd = "traincraft run examples/05_selection_funnel_demo.toml", description = "Funnel demo (no extra deps)" }
 example-06 = { cmd = "traincraft run examples/06_mace_mp0_sampling.toml",  description = "MACE-MP0 sampling (needs mace env)" }
+example-07 = { cmd = "traincraft run examples/07_co_on_cu_mc.toml",        description = "CO on Cu(111) + MC sampler (no extra deps)" }
+example-08 = { cmd = "traincraft run examples/08_smiles_molecule.toml",    description = "SMILES source + MD (needs science env)" }
+example-09 = { cmd = "traincraft run examples/09_packing_on_surface.toml", description = "Packmol surface packing + MC (needs science env)" }
 
 # ---------------------------------------------------------------------------
 # Tooling config

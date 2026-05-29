@@ -1,0 +1,39 @@
+# Example 08 — Build a molecule from SMILES and run MD
+#
+# What it shows:
+#   1. smiles source: ethanol (CCO) built with RDKit ETKDG and MMFF94 optimization.
+#      Fragment 0 = entire molecule (set automatically by the source).
+#      Canonical SMILES stored in provenance.extra for conformer moves.
+#   2. EMT MD — a cheap sanity check; replace with tblite or mace for real sampling.
+#
+# Requires the science environment (rdkit):
+#   pixi install -e science
+#   pixi run -e science example-08
+
+[run]
+name   = "08_smiles_ethanol"
+outdir = "runs"
+seed   = 7
+
+[geometry.source]
+type         = "smiles"
+smiles       = "CCO"       # ethanol
+n_conformers = 1
+optimize     = true
+vacuum       = 8.0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type        = "md"
+temperature = 300.0
+steps       = 50
+interval    = 10
+
+[selection]
+steps  = ["physicality", "dedup"]
+budget = 3
+
+[dataset]
+path = "dataset"

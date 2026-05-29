@@ -106,6 +106,9 @@ traincraft plugins                                # list all registered plugins
 | [`04_nanotube_supercell_rattle.toml`](examples/04_nanotube_supercell_rattle.toml) | Supercell + rattle | `sampling` |
 | [`05_selection_funnel_demo.toml`](examples/05_selection_funnel_demo.toml) | Selection funnel parameters | none |
 | [`06_mace_mp0_sampling.toml`](examples/06_mace_mp0_sampling.toml) | MACE-MP0 as sampler | `mace` |
+| [`07_co_on_cu_mc.toml`](examples/07_co_on_cu_mc.toml) | CO on Cu(111) + Metropolis MC | none |
+| [`08_smiles_molecule.toml`](examples/08_smiles_molecule.toml) | Molecule from SMILES + MD | `science` |
+| [`09_packing_on_surface.toml`](examples/09_packing_on_surface.toml) | Packmol surface coverage + MC | `science` |
 
 ---
 
