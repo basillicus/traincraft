@@ -1,0 +1,39 @@
+[run]
+name = "slab_strain_md"
+seed = 13
+outdir = "runs"
+# Bare Cu(111) slab (standalone `slab` builder) → 2% biaxial in-plane strain →
+# EMT → MD. Demonstrates the slab builder + the strain transform. Zero deps.
+# Run with:  pixi run example-13
+
+[geometry]
+
+[geometry.builder]
+type = "slab"
+element = "Cu"
+facet = "fcc111"
+size = [3, 3, 4]
+vacuum = 12.0
+
+# Biaxial in-plane tensile strain (e_xx = e_yy = 2%).
+[[geometry.transforms]]
+type = "strain"
+voigt = [0.02, 0.02, 0.0, 0.0, 0.0, 0.0]
+
+[calculator]
+type = "emt"
+
+[sampling]
+type = "md"
+temperature = 400.0
+steps = 200
+interval = 20
+timestep = 2.0
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 8
+min_distance = 0.7
+
+[dataset]
+path = "dataset"

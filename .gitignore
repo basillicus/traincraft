@@ -59,6 +59,9 @@ runs/
 # Pixi
 .pixi/
 
+# MkDocs build output
+site/
+
 # Python build/test caches
 *.egg-info/
 .eggs/

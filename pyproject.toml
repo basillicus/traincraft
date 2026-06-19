@@ -99,6 +99,12 @@ mdapackmol-fmt = "*"
 [tool.pixi.feature.descriptors.pypi-dependencies]
 dscribe = "*"
 
+# docs feature (MkDocs + Material + mkdocstrings) --------------------------
+[tool.pixi.feature.docs.pypi-dependencies]
+mkdocs-material   = ">=9.5"
+mkdocstrings      = {version = ">=0.25", extras = ["python"]}
+ruff              = ">=0.5"
+
 # mace feature (heavy: requires torch) ------------------------------------
 # Not included in 'science' by default; activate explicitly:
 #   pixi install -e mace
@@ -112,6 +118,7 @@ default = { solve-group = "default" }
 dev     = { features = ["dev"],                                    solve-group = "default" }
 science = { features = ["dev", "sampling", "semiempirical", "geometry", "descriptors"] }
 mace    = { features = ["dev", "mace"] }
+docs    = { features = ["docs"] }
 
 # Tasks --------------------------------------------------------------------
 # Run these from the repo root.  Use -e <env> to pick the environment:
@@ -134,6 +141,14 @@ example-08 = { cmd = "traincraft run examples/08_smiles_molecule.toml",    descr
 example-09 = { cmd = "traincraft run examples/09_packing_on_surface.toml", description = "Packmol surface packing + MC (needs science env)" }
 example-10 = { cmd = "traincraft run examples/10_ethanol_conformers_on_cu.toml", description = "Ethanol conformers on Cu(111) via MC (needs science env)" }
 example-11 = { cmd = "traincraft run examples/11_butane_conformers_on_cu.toml", description = "Butane gauche/anti landscape on Cu(111) via MC + Packmol (needs science env)" }
+example-12 = { cmd = "traincraft run examples/12_bulk_vacancy_md.toml",     description = "Bulk Cu crystal + vacancy defect + MD (no extra deps)" }
+example-13 = { cmd = "traincraft run examples/13_slab_strain_md.toml",      description = "Cu(111) slab + biaxial strain + MD (no extra deps)" }
+example-14 = { cmd = "traincraft run examples/14_graphene_bilayer_md.toml", description = "AB graphene bilayer (layered builder) + MD (no extra deps)" }
+example-15 = { cmd = "traincraft run examples/15_h_graphite_intercalation.toml", description = "H intercalated in graphite (intercalation builder) + MD (no extra deps)" }
+example-16 = { cmd = "traincraft run examples/16_slab_constraints_md.toml", description = "Cu(111) slab + frozen bottom layer (constraints) + MD (no extra deps)" }
+example-17 = { cmd = "traincraft run examples/17_water_box_liquid.toml", description = "Packmol water box (liquid builder) + xTB MD (needs science env)" }
+docs-serve = { cmd = "mkdocs serve",          description = "Serve docs locally with live reload (needs docs env)" }
+docs-build = { cmd = "mkdocs build --strict", description = "Build docs to site/ (needs docs env)" }
 
 # ---------------------------------------------------------------------------
 # Tooling config

@@ -1,0 +1,39 @@
+[run]
+name = "bulk_vacancy_md"
+seed = 7
+outdir = "runs"
+# Bulk Cu fcc crystal → 2x2x2 supercell with a single vacancy → EMT → MD.
+# Demonstrates the `crystal` builder + point defects. Zero extra deps.
+# Run with:  pixi run example-12
+
+[geometry]
+
+[geometry.builder]
+type = "crystal"
+name = "Cu"
+crystalstructure = "fcc"
+a = 3.61
+cubic = true
+supercell = [2, 2, 2]
+
+[[geometry.builder.defects]]
+kind = "vacancy"
+index = 0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type = "md"
+temperature = 600.0
+steps = 200
+interval = 20
+timestep = 2.0
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 8
+min_distance = 0.7
+
+[dataset]
+path = "dataset"

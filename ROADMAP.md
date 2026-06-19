@@ -78,19 +78,33 @@ Acceptance (met)
 - `examples/12_bulk_vacancy_md.toml`, `13_slab_strain_md.toml`, and
   `14_graphene_bilayer_md.toml` run end-to-end (zero extra deps).
 
-### Later Phase-1 chunks
+### ✅ Chunk 3 — Database providers + liquids + intercalation + constraints  *(done)*
 
-- Sources: providers (Materials Project, OPTIMADE, PubChem).
-- Builders: intercalation; polymers (PySoftK); liquids/mixtures/confined bulk
-  (Packmol).
-- Transforms: constraints (index-based reapplication after Packmol — fixes the
-  legacy bug at `gengeom.py:155`).
+- Sources: `materials_project` (mp-api + pymatgen), `optimade` (dependency-free
+  JSON parse against any provider base URL), `pubchem` (dependency-free 3D SDF
+  via PUG REST).
+- Builders: `liquid` (Packmol multi-species box; explicit cell *or* density-driven
+  cubic box; per-molecule fragment tagging) and `intercalation` (guests on an
+  in-plane grid in each gallery of a planar layered host, with electrochemical
+  `stage` control and `gallery_expansion`).
+- Transforms: `constraints` (`FixAtoms` by indices / elements / `tc_fragment` /
+  `below_z`, OR-ed). Selects on the *final* structure — the correct place to
+  (re)apply constraints after a reordering builder (Packmol), fixing the legacy
+  index-misalignment bug.
 
-Acceptance
-- Each builder produces a valid `Structure` with correct pbc/cell and provenance.
-- Legacy nanotube+CO2 dataset reproducible via the new geometry path.
-- `examples/07_co_on_cu_mc.toml` (zero deps), `08_smiles_molecule.toml`, and
-  `09_packing_on_surface.toml` work.
+Acceptance (met)
+- Each builder/source/transform yields a valid `Structure` with correct
+  pbc/cell and provenance; unit coverage in `test_constraints`,
+  `test_intercalation_builder`, `test_liquid_builder`, `test_providers`
+  (network/Packmol paths skip cleanly when deps are absent).
+- `examples/15_h_graphite_intercalation.toml` and `16_slab_constraints_md.toml`
+  run end-to-end (zero deps); `17_water_box_liquid.toml` runs in the science env.
+
+### Remaining Phase-1 item
+
+- Builder: `polymer` (PySoftK). Deferred — the PySoftK dependency is not reliably
+  resolvable (see `pyproject.toml`) and the wrapper must be verified against the
+  live PySoftK API before shipping rather than guessed.
 
 ---
 

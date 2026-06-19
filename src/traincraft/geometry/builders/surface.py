@@ -22,22 +22,11 @@ from ase.build import add_adsorbate, molecule
 from ase.io import read, write
 
 from ...core import Provenance, Structure, register, set_fragments
-
-# Map config facet strings to ase.build functions.
-_FACET_FN = {
-    "fcc111": "fcc111",
-    "fcc100": "fcc100",
-    "fcc110": "fcc110",
-    "bcc110": "bcc110",
-    "bcc100": "bcc100",
-    "hcp0001": "hcp0001",
-}
+from ._common import build_named_slab
 
 
 def _build_slab(element: str, facet: str, size: tuple, vacuum: float) -> Atoms:
-    import ase.build as ab
-    fn = getattr(ab, _FACET_FN[facet])
-    return fn(element, size=size, vacuum=vacuum / 2)
+    return build_named_slab(element, facet, size, vacuum)
 
 
 def _resolve_adsorbate(molecule_name, smiles, file) -> Atoms:

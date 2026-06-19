@@ -81,9 +81,25 @@ class Structure:
         from .fragments import fragment_ids
         return len(fragment_ids(self.atoms))
 
-    # --- interop stubs (implemented in the geometry chunk) -----------------
-    def to_pymatgen(self):  # pragma: no cover - Phase 2
-        raise NotImplementedError("pymatgen interop lands with the geometry chunk")
+    # --- interop (see core.converter) -------------------------------------
+    def to_pymatgen(self):
+        """Return a pymatgen ``Structure`` (periodic) or ``Molecule``."""
+        from .converter import ase_to_pymatgen
+        return ase_to_pymatgen(self.atoms)
 
-    def to_rdkit(self):  # pragma: no cover - Phase 2
-        raise NotImplementedError("rdkit interop lands with the geometry chunk")
+    def to_rdkit(self, charge: int = 0):
+        """Return an RDKit ``Mol`` with bonds perceived (non-periodic only)."""
+        from .converter import ase_to_rdkit
+        return ase_to_rdkit(self.atoms, charge=charge)
+
+    @classmethod
+    def from_pymatgen(cls, obj, **kwargs: Any) -> Structure:
+        """Build a :class:`Structure` from a pymatgen ``Structure``/``Molecule``."""
+        from .converter import pymatgen_to_ase
+        return cls.from_ase(pymatgen_to_ase(obj), **kwargs)
+
+    @classmethod
+    def from_rdkit(cls, mol, conf_id: int = 0, **kwargs: Any) -> Structure:
+        """Build a :class:`Structure` from one conformer of an RDKit ``Mol``."""
+        from .converter import rdkit_to_ase
+        return cls.from_ase(rdkit_to_ase(mol, conf_id=conf_id), **kwargs)

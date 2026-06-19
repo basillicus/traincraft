@@ -1,0 +1,42 @@
+[run]
+name = "h_graphite_intercalation"
+seed = 11
+outdir = "runs"
+# H intercalated into a 3-layer graphene (graphite) host → EMT → MD.
+# Demonstrates the `intercalation` builder (guests on a grid in each gallery,
+# host tagged tc_fragment=-1, guests=0). H + C are both EMT-supported, so this
+# runs with zero extra deps.
+# Run with:  pixi run example-15
+
+[geometry]
+
+[geometry.builder]
+type = "intercalation"
+guest = "H"
+n_per_gallery = 2
+stage = 1
+gallery_expansion = 1.0
+
+[geometry.builder.host]
+material = "graphene"
+n_layers = 3
+size = [2, 2]
+interlayer_spacing = 3.35
+
+[calculator]
+type = "emt"
+
+[sampling]
+type = "md"
+temperature = 400.0
+steps = 200
+interval = 20
+timestep = 1.0
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 8
+min_distance = 0.6
+
+[dataset]
+path = "dataset"

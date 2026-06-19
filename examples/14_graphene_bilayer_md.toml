@@ -1,0 +1,37 @@
+[run]
+name = "graphene_bilayer_md"
+seed = 14
+outdir = "runs"
+# AB-stacked graphene bilayer (3x3 in-plane) → EMT → MD. Demonstrates the
+# `layered` builder (interlayer spacing + Bernal stacking). EMT is a toy
+# potential for carbon here — this exercises the geometry path, not chemistry.
+# Run with:  pixi run example-14
+
+[geometry]
+
+[geometry.builder]
+type = "layered"
+material = "graphene"
+size = [3, 3]
+n_layers = 2
+stacking = "AB"
+interlayer_spacing = 3.35
+vacuum = 15.0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type = "md"
+temperature = 300.0
+steps = 200
+interval = 20
+timestep = 1.0
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 8
+min_distance = 0.7
+
+[dataset]
+path = "dataset"

@@ -1,0 +1,39 @@
+[run]
+name = "water_box_liquid"
+seed = 3
+outdir = "runs"
+# A periodic water box packed by Packmol from a target density, then MD.
+# Demonstrates the `liquid` builder (multi-species, density-driven box, per-
+# molecule fragment tagging). Needs the Packmol binary: pixi install -e science.
+# Run with:  pixi run -e science example-17
+
+[geometry]
+
+[geometry.builder]
+type = "liquid"
+density = 1.0       # g/cm^3 -> cubic box sized automatically
+tolerance = 2.0
+pbc = true
+
+[[geometry.builder.species]]
+molecule_name = "H2O"
+count = 32
+
+[calculator]
+type = "tblite"     # GFN2-xTB: handles molecular H/O (EMT does not)
+method = "GFN2-xTB"
+
+[sampling]
+type = "md"
+temperature = 300.0
+steps = 200
+interval = 20
+timestep = 0.5
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 8
+min_distance = 0.7
+
+[dataset]
+path = "dataset"

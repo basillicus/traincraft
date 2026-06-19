@@ -44,8 +44,51 @@ class SmilesSource(TCModel):
     vacuum: float = 6.0
 
 
+class UrlSource(TCModel):
+    type: Literal["url"] = "url"
+    url: str
+    format: str | None = None  # ASE format override; inferred from suffix if None
+    timeout: float = 30.0
+
+
+class MaterialsProjectSource(TCModel):
+    type: Literal["materials_project"] = "materials_project"
+    material_id: str  # e.g. "mp-149"
+    api_key: str | None = None  # else taken from $MP_API_KEY
+    conventional: bool = True  # conventional (vs primitive) unit cell
+
+
+class OptimadeSource(TCModel):
+    type: Literal["optimade"] = "optimade"
+    base_url: str  # an OPTIMADE provider base URL
+    filter: str | None = None  # OPTIMADE filter; first hit is returned
+    timeout: float = 30.0
+
+
+class PubchemSource(TCModel):
+    type: Literal["pubchem"] = "pubchem"
+    # exactly one identifier; resolved to a 3D conformer via PubChem PUG REST
+    cid: int | None = None
+    name: str | None = None
+    smiles: str | None = None
+    timeout: float = 30.0
+
+    @model_validator(mode="after")
+    def _one_id(self) -> PubchemSource:
+        if sum(x is not None for x in (self.cid, self.name, self.smiles)) != 1:
+            raise ValueError("pubchem source needs exactly one of 'cid', 'name', or 'smiles'")
+        return self
+
+
 SourceConfig = Annotated[
-    FileSource | ScratchSource | SmilesSource, Field(discriminator="type")
+    FileSource
+    | ScratchSource
+    | SmilesSource
+    | UrlSource
+    | MaterialsProjectSource
+    | OptimadeSource
+    | PubchemSource,
+    Field(discriminator="type"),
 ]
 
 
@@ -72,7 +115,65 @@ class MoleculeBuilder(TCModel):
         return self
 
 
-_FACETS = Literal["fcc111", "fcc100", "fcc110", "bcc110", "bcc100", "hcp0001"]
+_FACETS = Literal[
+    "fcc111", "fcc100", "fcc110", "bcc110", "bcc100", "bcc111", "hcp0001"
+]
+
+
+class DefectSpec(TCModel):
+    kind: Literal["vacancy", "substitution", "interstitial"]
+    index: int | None = None  # target atom (vacancy/substitution); default 0
+    element: str | None = None  # new element (substitution/interstitial)
+    position: tuple[float, float, float] | None = None  # interstitial site
+    cartesian: bool = False  # interstitial position is Cartesian (else fractional)
+
+    @model_validator(mode="after")
+    def _check(self) -> DefectSpec:
+        if self.kind == "substitution" and self.element is None:
+            raise ValueError("substitution defect needs 'element'")
+        if self.kind == "interstitial" and (
+            self.element is None or self.position is None
+        ):
+            raise ValueError("interstitial defect needs 'element' and 'position'")
+        return self
+
+
+class CrystalBuilder(TCModel):
+    type: Literal["crystal"] = "crystal"
+    name: str  # ase.build.bulk name, e.g. "Cu", "NaCl", "Si"
+    crystalstructure: str | None = None  # fcc/bcc/hcp/diamond/rocksalt/...
+    a: float | None = None
+    b: float | None = None
+    c: float | None = None
+    cubic: bool = False
+    orthorhombic: bool = False
+    supercell: tuple[int, int, int] = (1, 1, 1)
+    defects: list[DefectSpec] = Field(default_factory=list)
+
+
+class SlabBuilder(TCModel):
+    type: Literal["slab"] = "slab"
+    element: str
+    # Mode A: named facet (element-only). Mode B: miller indices from a bulk.
+    facet: _FACETS | None = "fcc111"
+    miller: tuple[int, int, int] | None = None
+    crystalstructure: str | None = None  # for miller mode (fcc/bcc/hcp/...)
+    a: float | None = None
+    c: float | None = None
+    cubic: bool = False
+    layers: int = 4
+    size: tuple[int, int, int] = (3, 3, 4)  # (nx, ny, layers); layers used by facet mode
+    vacuum: float = 12.0
+    orthogonal: bool = False  # facet mode
+    periodic: bool = False  # miller mode: keep periodic along the surface normal
+
+    @model_validator(mode="after")
+    def _one_mode(self) -> SlabBuilder:
+        if self.miller is not None:
+            self.facet = None  # miller mode takes precedence; clear the default facet
+        elif self.facet is None:
+            raise ValueError("slab builder needs either 'facet' or 'miller'")
+        return self
 
 
 class SurfaceAdsorbateBuilder(TCModel):
@@ -128,8 +229,72 @@ class SurfacePackingBuilder(TCModel):
         return self
 
 
+class LayeredBuilder(TCModel):
+    type: Literal["layered"] = "layered"
+    material: Literal["graphene", "hbn", "mx2"] = "graphene"
+    formula: str | None = None  # mx2 only, e.g. "MoS2", "WSe2"
+    a: float | None = None  # in-plane lattice constant override
+    size: tuple[int, int] = (1, 1)  # in-plane repeats of the monolayer
+    n_layers: int = 2
+    interlayer_spacing: float = 3.35  # Å (graphite default)
+    stacking: Literal["AA", "AB"] = "AB"
+    twist: float = 0.0  # degrees; nonzero -> non-periodic moiré flake
+    vacuum: float = 15.0
+
+
+class LiquidSpecies(TCModel):
+    # exactly one of molecule_name | smiles | file identifies the species
+    molecule_name: str | None = None
+    smiles: str | None = None
+    file: str | None = None
+    count: int = 1
+
+    @model_validator(mode="after")
+    def _one_source(self) -> LiquidSpecies:
+        if sum(x is not None for x in (self.molecule_name, self.smiles, self.file)) != 1:
+            raise ValueError(
+                "liquid species needs exactly one of 'molecule_name', 'smiles', 'file'"
+            )
+        return self
+
+
+class LiquidBuilder(TCModel):
+    type: Literal["liquid"] = "liquid"
+    species: list[LiquidSpecies]
+    box: tuple[float, float, float] | None = None  # explicit cell edges (Å)
+    density: float | None = None  # g/cm³; cubic box derived when 'box' is unset
+    tolerance: float = 2.0  # Packmol min separation / wall inset (Å)
+    pbc: bool = True
+    seed: int | None = None
+
+    @model_validator(mode="after")
+    def _box_or_density(self) -> LiquidBuilder:
+        if not self.species:
+            raise ValueError("liquid builder needs at least one species")
+        if (self.box is None) == (self.density is None):
+            raise ValueError("liquid builder needs exactly one of 'box' or 'density'")
+        return self
+
+
+class IntercalationBuilder(TCModel):
+    type: Literal["intercalation"] = "intercalation"
+    host: LayeredBuilder  # planar layered host (graphene/hbn); mx2 rejected
+    guest: str = "Li"  # intercalant element symbol
+    n_per_gallery: int = 1  # guest atoms per filled gallery (in-plane grid)
+    stage: int = 1  # fill galleries whose index % stage == 0
+    gallery_expansion: float = 0.0  # Å added to c per filled gallery
+
+
 BuilderConfig = Annotated[
-    NanotubeBuilder | MoleculeBuilder | SurfaceAdsorbateBuilder | SurfacePackingBuilder,
+    NanotubeBuilder
+    | MoleculeBuilder
+    | SurfaceAdsorbateBuilder
+    | SurfacePackingBuilder
+    | CrystalBuilder
+    | SlabBuilder
+    | LayeredBuilder
+    | LiquidBuilder
+    | IntercalationBuilder,
     Field(discriminator="type"),
 ]
 
@@ -150,8 +315,49 @@ class PerturbTransform(TCModel):
     stddev: float = 0.05
 
 
+class StrainTransform(TCModel):
+    type: Literal["strain"] = "strain"
+    # exactly one of: hydrostatic OR voigt (e_xx, e_yy, e_zz, e_yz, e_xz, e_xy)
+    hydrostatic: float | None = None
+    voigt: tuple[float, float, float, float, float, float] | None = None
+
+    @model_validator(mode="after")
+    def _one_form(self) -> StrainTransform:
+        n = (self.hydrostatic is not None) + (self.voigt is not None)
+        if n != 1:
+            raise ValueError("strain needs exactly one of 'hydrostatic' or 'voigt'")
+        return self
+
+
+class RotateTransform(TCModel):
+    type: Literal["rotate"] = "rotate"
+    angle: float  # degrees
+    axis: Literal["x", "y", "z"] | tuple[float, float, float] = "z"
+    rotate_cell: bool = False
+
+
+class SetPbcTransform(TCModel):
+    type: Literal["set_pbc"] = "set_pbc"
+    pbc: bool | tuple[bool, bool, bool] = True
+
+
+class ConstraintsTransform(TCModel):
+    type: Literal["constraints"] = "constraints"
+    # selectors are OR-ed; at least one must select an atom
+    indices: list[int] | None = None
+    elements: list[str] | None = None  # fix all atoms of these symbols
+    fragments: list[int] | None = None  # fix atoms with these tc_fragment ids
+    below_z: float | None = None  # fix atoms with Cartesian z below this (Å)
+
+
 TransformConfig = Annotated[
-    VacuumTransform | SupercellTransform | PerturbTransform,
+    VacuumTransform
+    | SupercellTransform
+    | PerturbTransform
+    | StrainTransform
+    | RotateTransform
+    | SetPbcTransform
+    | ConstraintsTransform,
     Field(discriminator="type"),
 ]
 
@@ -192,8 +398,59 @@ class MaceCalc(TCModel):
     default_dtype: str = "float32"
 
 
+# Properties a DFT labeler may be asked to produce beyond E/F/stress (always on).
+_DFT_PROP = Literal["dipole", "polarizability"]
+
+
+class FhiAimsCalc(TCModel):
+    """FHI-aims DFT labeler (ASE ``FileIOCalculator``).
+
+    The run command is *not* configured here: it is injected from the
+    environment (``TRAINCRAFT_AIMS_COMMAND``, default ``aims.x``) so the plugin
+    stays container-agnostic (see DESIGN §20.3). Likewise the species directory
+    falls back to ``TRAINCRAFT_AIMS_SPECIES_DIR`` / ``AIMS_SPECIES_DIR`` when
+    ``species_dir`` is left unset.
+    """
+
+    type: Literal["fhi_aims"] = "fhi_aims"
+    # extra properties to label (energy/forces/stress are always requested)
+    properties: list[_DFT_PROP] = Field(default_factory=list)
+    # core DFT settings
+    xc: str = "pbe"
+    species_defaults: str = "light"  # basis level: light | intermediate | tight | ...
+    species_dir: str | None = None  # explicit path; else taken from env
+    kpts: tuple[int, int, int] | None = None  # Monkhorst-Pack grid (periodic only)
+    relativistic: str = "atomic_zora scalar"
+    spin: Literal["none", "collinear"] = "none"
+    # periodicity hint for DFPT mode selection; auto-True when kpts is given
+    periodic: bool | None = None
+    # arbitrary control.in keywords passed through verbatim to ASE-Aims
+    extra: dict = Field(default_factory=dict)
+
+
+class QeCalc(TCModel):
+    """Quantum ESPRESSO ``pw.x`` DFT labeler (ASE ``Espresso``).
+
+    Command injected from ``TRAINCRAFT_PW_COMMAND`` (default ``pw.x``);
+    pseudopotential directory from ``pseudo_dir`` or
+    ``TRAINCRAFT_PW_PSEUDO_DIR`` / ``ESPRESSO_PSEUDO``.
+    """
+
+    type: Literal["qe"] = "qe"
+    # only "dipole" is supported via SCF; polarizability needs ph.x (see dft.py)
+    properties: list[_DFT_PROP] = Field(default_factory=list)
+    pseudo_dir: str | None = None  # else taken from env
+    pseudopotentials: dict = Field(default_factory=dict)  # {symbol: UPF filename}
+    kpts: tuple[int, int, int] | None = None
+    kspacing: float | None = None  # alternative to kpts (A^-1)
+    ecutwfc: float = 60.0  # Ry
+    ecutrho: float | None = None  # Ry; QE default (4*ecutwfc) when None
+    input_data: dict = Field(default_factory=dict)  # nested/flat pw.x namelists
+
+
 CalculatorConfig = Annotated[
-    EmtCalc | TbliteCalc | XtbCalc | MaceCalc, Field(discriminator="type")
+    EmtCalc | TbliteCalc | XtbCalc | MaceCalc | FhiAimsCalc | QeCalc,
+    Field(discriminator="type"),
 ]
 
 

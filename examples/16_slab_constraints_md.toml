@@ -1,0 +1,41 @@
+[run]
+name = "slab_constraints_md"
+seed = 5
+outdir = "runs"
+# Cu(111) slab with the bottom layer frozen (constraints transform, below_z) → MD.
+# Demonstrates index-stable constraint reapplication on the final structure —
+# the right place to freeze a substrate before sampling. Zero extra deps.
+# Run with:  pixi run example-16
+
+[geometry]
+
+[geometry.builder]
+type = "slab"
+element = "Cu"
+facet = "fcc111"
+size = [3, 3, 4]
+vacuum = 12.0
+
+# Freeze every atom whose Cartesian z is below 7 Å (the bottom layer sits at
+# ~6 Å after centring; the next layer is at ~8 Å).
+[[geometry.transforms]]
+type = "constraints"
+below_z = 7.0
+
+[calculator]
+type = "emt"
+
+[sampling]
+type = "md"
+temperature = 500.0
+steps = 200
+interval = 20
+timestep = 2.0
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 8
+min_distance = 0.7
+
+[dataset]
+path = "dataset"

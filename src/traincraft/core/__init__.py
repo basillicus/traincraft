@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from .converter import (
+    ase_to_pymatgen,
+    ase_to_rdkit,
+    pymatgen_to_ase,
+    rdkit_to_ase,
+)
 from .fragments import (
     FRAGMENT_KEY,
     FRAMEWORK,
@@ -29,6 +35,8 @@ __all__ = [
     "Result",
     "Structure",
     "Workspace",
+    "ase_to_pymatgen",
+    "ase_to_rdkit",
     "available",
     "capabilities",
     "fragment_ids",
@@ -37,6 +45,8 @@ __all__ = [
     "get",
     "infer_fragments",
     "make_rng",
+    "pymatgen_to_ase",
+    "rdkit_to_ase",
     "register",
     "set_fragments",
 ]
