@@ -11,7 +11,7 @@ a sequence of transforms.
 | | Source | Builder |
 |---|---|---|
 | **Starting point** | An existing structure | Constructs from scratch |
-| **Examples** | `file`, `scratch`, `smiles`, `url` | `crystal`, `slab`, `layered`, `nanotube` |
+| **Examples** | `file`, `scratch`, `smiles`, `url`, `materials_project`, `optimade`, `pubchem` | `crystal`, `slab`, `layered`, `nanotube`, `liquid`, `intercalation` |
 | **TOML key** | `[geometry.source]` | `[geometry.builder]` |
 | **Use when** | You have a geometry already | You want to generate one |
 
@@ -58,6 +58,35 @@ url    = "https://example.com/structure.xyz"
 format = "xyz"      # optional; inferred from suffix
 ```
 
+### `materials_project`
+Fetches a bulk crystal by Materials Project id (needs `mp-api` + `pymatgen`;
+API key from config or `$MP_API_KEY`):
+```toml
+[geometry.source]
+type        = "materials_project"
+material_id = "mp-149"     # Si
+conventional = true
+```
+
+### `optimade`
+Returns the first hit of an [OPTIMADE](https://www.optimade.org/) filter against
+any provider base URL (dependency-free — the JSON is parsed directly):
+```toml
+[geometry.source]
+type     = "optimade"
+base_url = "https://optimade.materialsproject.org/v1"
+filter   = 'chemical_formula_reduced="SiO2"'
+```
+
+### `pubchem`
+Downloads a 3D conformer by name / CID / SMILES from the PubChem PUG REST API
+(dependency-free — an SDF is fetched and read by ASE):
+```toml
+[geometry.source]
+type = "pubchem"
+name = "caffeine"          # or: cid = 2519 / smiles = "..."
+```
+
 ---
 
 ## Builders
@@ -71,6 +100,39 @@ format = "xyz"      # optional; inferred from suffix
 | `layered` | 2D material stack | `material`, `n_layers`, `stacking`, `twist` |
 | `surface_adsorbate` | Molecule on slab | `element`, `facet`, `molecule_name`/`smiles`/`file` |
 | `surface_packing` | N molecules on slab | same + `n_molecules`, Packmol |
+| `liquid` | Liquid / mixture / confined bulk | `species`, `box` *or* `density`, Packmol |
+| `intercalation` | Guests in a layered host | `host`, `guest`, `n_per_gallery`, `stage` |
+
+The `liquid` builder packs one or more molecular species into a periodic box —
+either a literal `box = [a, b, c]` (Å) or a cubic cell sized from a target mass
+`density` (g/cm³). Every packed molecule becomes its own `tc_fragment`:
+
+```toml
+[geometry.builder]
+type    = "liquid"
+density = 1.0        # g/cm^3  (or: box = [15, 15, 15])
+tolerance = 2.0
+
+[[geometry.builder.species]]
+molecule_name = "H2O"
+count = 32
+```
+
+The `intercalation` builder inserts guest atoms on an in-plane grid into each
+gallery of a **planar** layered host (graphene / hBN; `mx2` rejected). `stage`
+controls electrochemical staging (fill every `stage`-th gallery):
+
+```toml
+[geometry.builder]
+type          = "intercalation"
+guest         = "Li"
+n_per_gallery = 2
+stage         = 1
+
+[geometry.builder.host]
+material = "graphene"
+n_layers = 3
+```
 
 ---
 
@@ -105,6 +167,17 @@ All transforms preserve the `Structure` interface — they return a new
 | `strain` | Elastic deformation: `hydrostatic` or Voigt 6-vector |
 | `rotate` | Rigid rotation about an axis |
 | `set_pbc` | Change periodic boundary conditions |
+| `constraints` | Freeze atoms (`FixAtoms`) by `indices`/`elements`/`fragments`/`below_z` |
+
+`constraints` selects on the **final** structure (selectors are OR-ed), which is
+the correct place to (re)apply constraints after a builder that reorders atoms
+(e.g. Packmol) — for example, freezing the bottom of a slab before sampling:
+
+```toml
+[[geometry.transforms]]
+type    = "constraints"
+below_z = 7.0       # freeze every atom with Cartesian z below 7 Å
+```
 
 ---
 
