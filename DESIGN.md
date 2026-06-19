@@ -356,3 +356,108 @@ add-on, not a rewrite. Deferred, but kept feasible by the architecture.
 - Standalone post-processing scripts (folded into `datasets/`).
 - The name `mlip.py` — the file is `potentials.py` because EMT (force field)
   and tblite/xtb (semiempirical) are **not** MLIPs.
+
+---
+
+## 20. Deployment: containers & HPC (Leonardo)
+
+Production DFT labeling and MLIP training run on **CINECA Leonardo**. The package
+is shipped as **Apptainer** images, deliberately **split into three** rather than
+one monolith. The split is not a workaround — it falls out of the architecture:
+the container boundary is the same boundary as the calculator/sampler plugin seam
+(§2.2), and the three images map onto three different concerns (hardware target,
+rebuild cadence, and licensing).
+
+### 20.1 The three images
+
+| Image | Target | Contents | Shareable? |
+|-------|--------|----------|------------|
+| `traincraft-core.sif` | CPU (login + DCGP) | `traincraft` + CPU science stack: ASE, pymatgen, RDKit, Packmol, hiphive, tblite/xtb, dscribe, pydantic, Typer. **The orchestrator.** | yes |
+| `traincraft-mlip.sif` | GPU (Booster, A100/CUDA) | `traincraft` + PyTorch + CUDA + MACE (+ training deps). Runs MLIP sampling and training stages. | yes |
+| `traincraft-dft.sif` | CPU (DCGP, Sapphire Rapids) | **FHI-aims** compiled with MPI + MKL + ScaLAPACK, plus `species_defaults`. Invoked as a bare MPI binary. | **no — licensed, private build** |
+
+Rationale for splitting:
+1. **Hardware** — MACE wants the GPU Booster; FHI-aims wants the CPU DCGP
+   partition. One image cannot be optimal for both.
+2. **Rebuild cadence** — tweaking the TOML parser must not require rebuilding a
+   multi-GB CUDA image, nor recompiling FHI-aims.
+3. **Licensing** — FHI-aims is **not redistributable**. Isolating it in its own
+   image keeps `core` and `mlip` freely shareable, and keeps the licensed source
+   out of every other build context (and out of this repo — see §20.5).
+
+### 20.2 Run model — orchestrator dispatches Slurm steps
+
+`traincraft-core` is the orchestrator. It does **not** nest container execs.
+Instead, each pipeline stage that needs a different environment is rendered as a
+**Slurm job step** that `apptainer exec`s the appropriate image:
+
+```
+# GPU stage (sampling with MACE, or training) — runs traincraft inside mlip
+srun --nv apptainer exec --bind "$SCRATCH" traincraft-mlip.sif \
+     traincraft <stage> --job-dir "$JOB"
+
+# DFT label step — srun launches the bare FHI-aims MPI binary inside dft
+srun apptainer exec --bind "$SCRATCH",<host-mpi-binds> traincraft-dft.sif aims.x
+```
+
+This is the HPC-native pattern: Slurm (host PMI/`srun`) owns process launch and
+the interconnect; the container only supplies the software. It scales to the
+active-learning fan-out (many parallel explore/label steps) without nested
+runtimes.
+
+### 20.3 Keeping the science container-agnostic (command injection)
+
+The science plugins must not know they live in a container — that would couple
+the pure functions (§2.1) to deployment. The container/`srun` wrapper is injected
+by the **orchestration/executor layer**, not hard-coded in plugins:
+
+- **`dft.py`** (FHI-aims, an ASE `FileIOCalculator`) reads its run command from
+  config/env (e.g. `TRAINCRAFT_AIMS_COMMAND`), defaulting to plain `aims.x` for
+  local/dev. On Leonardo the executor sets it to
+  `srun apptainer exec --bind … traincraft-dft.sif aims.x`. The plugin writes
+  `control.in`/`geometry.in` and parses `aims.out` exactly as locally.
+- **`mace`** similarly takes `device`/launch context from the environment.
+
+So `core` prepares inputs and parses outputs; `dft.sif` is a pure FHI-aims worker
+with **no Python and no `traincraft` inside it**. By contrast `mlip.sif` *does*
+embed `traincraft`, because MLIP sampling/training are Python stages run directly
+on the GPU.
+
+A small `executor` config (image path, partition, resources, `mpi: true/false`,
+`gpu: true/false`) lives with orchestration. Choosing local-vs-Slurm and which
+`.sif` to exec is an orchestration decision; the science layer is untouched —
+consistent with principle #4 (orchestration is the last, swappable layer).
+
+### 20.4 FHI-aims & MPI on Leonardo (the hard part)
+
+The genuinely delicate piece is **multi-node MPI from inside a container**. A
+bundled MPI alone will not use Leonardo's InfiniBand and will not scale across
+nodes. We use the **hybrid model**:
+
+- FHI-aims is compiled in the image against an MPI that is **ABI-compatible with
+  the host** (Intel MPI / MPICH ABI), with MKL + ScaLAPACK, targeting Sapphire
+  Rapids.
+- At runtime, `srun` launches ranks (host PMI), and the host's
+  MPI/`libfabric`/UCX are **bind-mounted** so FHI-aims drives the real fabric.
+- DFPT (polarizability, the Raman driver) must be enabled in the FHI-aims build.
+
+Exact compiler/MPI/module versions are resolved at build time against the
+Leonardo modules in use; documented in `containers/README.md`.
+
+### 20.5 Building & licensing
+
+- **Build location:** Leonardo login nodes typically disallow rooted
+  `apptainer build`. Images are built with `--fakeroot` where permitted, or built
+  off-cluster/in CI and the `.sif` transferred (`scp`/`rsync`) to Leonardo.
+- **Definition files** live in `containers/` (`*.def`). `core.def` and `mlip.def`
+  are public; `dft.def` references FHI-aims source/license that is **never
+  committed** — it is supplied at build time via a build path/arg and documented,
+  not stored, in the repo.
+
+### 20.6 Image ↔ stage map
+
+```
+geometry / selection / datasets / orchestration   → core.sif  (CPU)
+sampling (MD/MC) + training (MACE)                 → mlip.sif (GPU, --nv)
+DFT labeling (FHI-aims, E/F/stress/dipole/pol.)    → dft.sif  (CPU, host-MPI)
+```

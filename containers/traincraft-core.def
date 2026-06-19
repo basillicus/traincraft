@@ -1,0 +1,45 @@
+Bootstrap: docker
+From: ghcr.io/prefix-dev/pixi:latest
+
+# traincraft-core — CPU orchestrator image.
+#
+# Contents: the traincraft package + the CPU science stack (ASE, pymatgen,
+# RDKit, Packmol, hiphive, tblite, dscribe) via the pixi `science` environment.
+# This image builds geometry, runs the selection funnel and datasets, and acts
+# as the orchestrator that dispatches Slurm steps into the mlip/dft images.
+#
+# Reproducible: built from pyproject.toml + pixi.lock.
+
+%files
+    ../pyproject.toml /opt/traincraft/pyproject.toml
+    ../pixi.lock      /opt/traincraft/pixi.lock
+    ../README.md      /opt/traincraft/README.md
+    ../LICENSE        /opt/traincraft/LICENSE
+    ../src            /opt/traincraft/src
+
+%post
+    set -eux
+    cd /opt/traincraft
+    # Materialise the locked `science` environment (geometry + sampling +
+    # semiempirical + descriptors + dev) into the image.
+    pixi install --locked -e science
+    # Sanity-check the package imports and the CLI resolves.
+    pixi run -e science python -c "import traincraft; print(traincraft.__name__)"
+
+%environment
+    export PIXI_ENV=science
+    export TRAINCRAFT_HOME=/opt/traincraft
+
+%runscript
+    cd /opt/traincraft
+    exec pixi run -e science traincraft "$@"
+
+%labels
+    org.traincraft.image core
+    org.traincraft.target cpu
+
+%help
+    TrainCraft CPU orchestrator. Run a workflow:
+      apptainer run traincraft-core.sif run config.toml
+    Or exec the CLI directly:
+      apptainer exec traincraft-core.sif pixi run -e science traincraft --help

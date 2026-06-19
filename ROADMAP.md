@@ -54,15 +54,37 @@ on it:
 - `sampling/monte_carlo.py` — Metropolis MC with rigid-body translate/rotate +
   RDKit conformer-swap moves; optional `refresh_fragments` for bond-changing runs.
 
+### ✅ Chunk 2 — Mechanical geometry breadth  *(done)*
+
+Unblocked by the fragment abstraction from Chunk 1:
+- `core/converter.py` — ASE ↔ pymatgen ↔ RDKit bridge (periodic→`Structure`,
+  molecular→`Molecule`; RDKit bond perception via `DetermineBonds`). Wired into
+  `Structure.to_/from_pymatgen` and `.to_/from_rdkit`.
+- Source: `url` (download → ASE read; `file://` works for local/offline use).
+- Builders: `crystal` (bulk via `ase.build.bulk` + supercell + vacancy/
+  substitution/interstitial defects with stable indexing); `slab` (standalone
+  surface — named facet *or* Miller indices cleaved from bulk; bare slab is all
+  framework); `layered` (graphene/hBN/MX2 stacking with interlayer spacing,
+  AA/AB Bernal stacking, and twist — twisted stacks return a non-periodic moiré
+  flake to avoid incommensurate-cell artefacts).
+- Transforms: `strain` (hydrostatic or Voigt; scales atoms with the cell),
+  `rotate` (named axis or vector, optional cell rotation), `set_pbc`.
+
+Acceptance (met)
+- Each builder/transform produces a valid `Structure` with correct pbc/cell and
+  provenance; full unit coverage (`test_converter`, `test_crystal_builder`,
+  `test_slab_builder`, `test_layered_builder`, `test_transforms`,
+  `test_url_source`).
+- `examples/12_bulk_vacancy_md.toml`, `13_slab_strain_md.toml`, and
+  `14_graphene_bilayer_md.toml` run end-to-end (zero extra deps).
+
 ### Later Phase-1 chunks
 
-- `converter.py` — ASE ↔ pymatgen ↔ RDKit bridge.
-- Sources: `url` (download → read), providers (Materials Project, OPTIMADE, PubChem).
-- Builders: bulk crystal + defects (vacancy/substitution/interstitial); surface/
-  slab; layered/2D (stacking, interlayer spacing, twist); intercalation; polymers
-  (PySoftK); liquids/mixtures/confined bulk (Packmol).
-- Transforms: strain, rotate, set pbc, constraints (index-based reapplication after
-  Packmol — fixes the legacy bug at `gengeom.py:155`).
+- Sources: providers (Materials Project, OPTIMADE, PubChem).
+- Builders: intercalation; polymers (PySoftK); liquids/mixtures/confined bulk
+  (Packmol).
+- Transforms: constraints (index-based reapplication after Packmol — fixes the
+  legacy bug at `gengeom.py:155`).
 
 Acceptance
 - Each builder produces a valid `Structure` with correct pbc/cell and provenance.
@@ -74,11 +96,15 @@ Acceptance
 
 ## Phase 2 — DFT labeling with full property set
 
-**Goal:** label E/F/stress + dipole + polarizability.
+**Goal:** label E/F/stress + dipole + polarizability. **Production target is
+FHI-aims on CINECA Leonardo** (see "Packaging & HPC deployment" below).
 
 Deliverables
 - `calculators/dft.py` — QE and FHI-AIMS factories; SCF for E/F/stress; dipole
   output; **polarizability via DFPT** (AIMS `DFPT dielectric`; QE `ph.x`).
+  FHI-aims is an ASE `FileIOCalculator`; its run command is **injected from the
+  environment** (`TRAINCRAFT_AIMS_COMMAND`, default `aims.x`) so the plugin stays
+  container-agnostic (DESIGN §20.3).
 - Labeled results written to extxyz with level-of-theory provenance.
 - Cost-aware labeling (polarizability flagged as the expensive task; selection
   accounts for the cost).
@@ -87,6 +113,34 @@ Deliverables
 Acceptance
 - A selected frame is labeled with all requested properties and lands in
   `labeled_dft/` with provenance; QE and AIMS paths verified on a tiny system.
+- FHI-aims path verified end-to-end inside `traincraft-dft.sif` (a tiny molecule,
+  single node) before scaling.
+
+---
+
+## Cross-cutting — Packaging & HPC deployment (Leonardo)
+
+**Goal:** run the real workflow on CINECA Leonardo via Apptainer. Gates Phase 2
+(DFT labeling) and Phase 3 (MACE training at scale). Full architecture in
+[`DESIGN.md` §20](DESIGN.md).
+
+Three images, dispatched as Slurm steps by the `core` orchestrator:
+- `traincraft-core.sif` (CPU) — package + geometry/selection/datasets/orchestration.
+- `traincraft-mlip.sif` (GPU/Booster) — PyTorch + CUDA + MACE; sampling + training.
+- `traincraft-dft.sif` (CPU/DCGP) — **FHI-aims** (MPI/MKL/ScaLAPACK); private build.
+
+Deliverables
+- `containers/` — three Apptainer `*.def` files + README (build via fakeroot /
+  off-cluster, then transfer the `.sif`; FHI-aims license/source kept out of the repo).
+- `orchestration/` executor config: per-stage `(image, partition, resources,
+  gpu?, mpi?)`; renders `srun [--nv] apptainer exec --bind … <image> <cmd>`.
+- Command-injection plumbing so `dft.py`/`mace` are container-agnostic.
+- FHI-aims hybrid-MPI binding (host MPI/libfabric/UCX) verified multi-node.
+
+Acceptance
+- `core` builds geometry and dispatches a GPU sampling step (`mlip.sif`) and a
+  multi-node FHI-aims label step (`dft.sif`) on Leonardo; results land in the
+  dataset with provenance, identical in shape to a local `emt` run.
 
 ---
 

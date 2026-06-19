@@ -1,0 +1,76 @@
+Bootstrap: docker
+From: intel/oneapi-hpckit:2024.2.1-devel-ubuntu22.04
+
+# traincraft-dft — FHI-aims labeling image for Leonardo DCGP (Sapphire Rapids).
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ PRIVATE / LICENSED. FHI-aims is NOT redistributable. Its source is NOT    │
+# │ committed to this repo — supply it at build time via --build-arg          │
+# │ AIMS_SRC=/path/to/fhi-aims.tar.gz. Never push this .sif to a public       │
+# │ registry.                                                                 │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# Contents: only FHI-aims (aims.x) compiled with Intel MPI + MKL + ScaLAPACK,
+# plus species_defaults. No Python, no traincraft — it is a bare MPI worker.
+# traincraft-core (ASE FileIOCalculator) writes control.in/geometry.in and parses
+# aims.out around `srun apptainer exec traincraft-dft.sif aims.x`.
+#
+# MPI: hybrid model. Built against Intel MPI (MPICH ABI) so that at runtime the
+# host MPI / libfabric / UCX (bind-mounted) drive Leonardo's InfiniBand. A
+# bundled MPI alone will NOT scale across nodes.
+
+%arguments
+    AIMS_SRC=fhi-aims.tar.gz
+
+%files
+    {{ AIMS_SRC }} /opt/aims-src.tar.gz
+
+%post
+    set -eux
+    apt-get update && apt-get install -y --no-install-recommends cmake make git ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    source /opt/intel/oneapi/setvars.sh
+
+    mkdir -p /opt/aims && tar -xf /opt/aims-src.tar.gz -C /opt/aims --strip-components=1
+    cd /opt/aims && mkdir -p build && cd build
+
+    # TODO(leonardo): align compiler/MPI/flags with the FHI-aims version and the
+    # Leonardo modules. Key points:
+    #   - Intel ifx/icx + MKL + ScaLAPACK; -DUSE_MPI=ON; enable DFPT (polarizability).
+    #   - Target Sapphire Rapids (e.g. -xSAPPHIRERAPIDS).
+    #   - MPI must be ABI-compatible with the host (Intel MPI / MPICH ABI).
+    cmake -DCMAKE_Fortran_COMPILER=mpiifx \
+          -DCMAKE_C_COMPILER=mpiicx \
+          -DUSE_MPI=ON \
+          -DUSE_SCALAPACK=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          ..
+    make -j"$(nproc)" aims.x
+
+    install -d /opt/aims/bin
+    cp /opt/aims/build/aims.x /opt/aims/bin/aims.x
+    # species_defaults ship with the source tree; keep them discoverable.
+    ln -s /opt/aims/species_defaults /opt/aims/bin/species_defaults || true
+
+    rm -f /opt/aims-src.tar.gz
+
+%environment
+    export PATH=/opt/aims/bin:$PATH
+    export AIMS_SPECIES_DIR=/opt/aims/species_defaults
+    # Use the HOST MPI/fabric at runtime (bind-mounted via apptainer --bind).
+    # TODO(leonardo): set I_MPI_* / FI_PROVIDER and bind paths per the host modules.
+
+%runscript
+    exec aims.x "$@"
+
+%labels
+    org.traincraft.image dft
+    org.traincraft.target cpu-mpi
+    org.traincraft.license fhi-aims-private
+
+%help
+    FHI-aims worker. Launched by srun for host-PMI process management:
+      srun apptainer exec --bind "$SCRATCH",<host-mpi> traincraft-dft.sif aims.x
+    Inputs (control.in/geometry.in) are prepared, and aims.out parsed, by
+    traincraft-core via its dft.py FileIOCalculator (TRAINCRAFT_AIMS_COMMAND).

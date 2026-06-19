@@ -1,0 +1,52 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+# traincraft-mlip — GPU image for Leonardo Booster (A100).
+#
+# Contents: the traincraft package + PyTorch (CUDA) + MACE. Runs the MLIP
+# sampling stages (MD/MC driven by a MACE potential) and MACE training directly
+# on the GPU. Dispatched as: `srun --nv apptainer exec traincraft-mlip.sif ...`.
+#
+# TODO(leonardo): confirm the CUDA base tag matches the Booster driver/CUDA
+# stack in use, and pin the matching torch CUDA build below.
+
+%files
+    ../pyproject.toml /opt/traincraft/pyproject.toml
+    ../pixi.lock      /opt/traincraft/pixi.lock
+    ../README.md      /opt/traincraft/README.md
+    ../LICENSE        /opt/traincraft/LICENSE
+    ../src            /opt/traincraft/src
+
+%post
+    set -eux
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git
+    rm -rf /var/lib/apt/lists/*
+
+    # Install pixi.
+    curl -fsSL https://pixi.sh/install.sh | bash
+    export PATH="/root/.pixi/bin:$PATH"
+
+    cd /opt/traincraft
+    # Materialise the locked `mace` environment (torch + mace-torch + dev).
+    # TODO(leonardo): ensure the torch build resolved here is the CUDA wheel
+    # matching the base image's CUDA (e.g. cu124), not the CPU build.
+    pixi install --locked -e mace
+
+    pixi run -e mace python -c "import torch, mace; print('cuda', torch.cuda.is_available())"
+
+%environment
+    export PATH="/root/.pixi/bin:$PATH"
+    export PIXI_ENV=mace
+    export TRAINCRAFT_HOME=/opt/traincraft
+
+%runscript
+    cd /opt/traincraft
+    exec pixi run -e mace traincraft "$@"
+
+%labels
+    org.traincraft.image mlip
+    org.traincraft.target gpu-cuda
+
+%help
+    TrainCraft GPU worker (MACE sampling + training). Run with --nv:
+      srun --nv apptainer exec traincraft-mlip.sif traincraft <stage> ...
