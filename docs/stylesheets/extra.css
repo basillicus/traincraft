@@ -1,0 +1,33 @@
+/* TrainCraft docs — minor cosmetic tweaks on top of Material */
+
+/* Slightly wider content area on large screens */
+.md-grid {
+  max-width: 1200px;
+}
+
+/* Subtle teal border on admonition titles */
+.md-typeset .admonition.example > .admonition-title {
+  border-inline-start-color: var(--md-accent-fg-color);
+}
+
+/* Code block font size — slightly smaller so wide lines fit */
+.md-typeset pre code {
+  font-size: 0.82em;
+}
+
+/* Home page hero banner */
+.hero {
+  text-align: center;
+  padding: 3rem 1rem 2rem;
+}
+.hero h1 {
+  font-size: 2.8rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+.hero p.subtitle {
+  font-size: 1.2rem;
+  color: var(--md-default-fg-color--light);
+  max-width: 640px;
+  margin: 0 auto 2rem;
+}

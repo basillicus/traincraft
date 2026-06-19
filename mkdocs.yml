@@ -1,0 +1,138 @@
+site_name: TrainCraft
+site_description: >-
+  Modular MLIP dataset generation and active learning — build training data
+  for MACE and other machine-learned interatomic potentials.
+site_url: https://traincraft.readthedocs.io
+repo_url: https://github.com/your-org/traincraft
+repo_name: traincraft
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - scheme: default
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/atom
+  features:
+    - navigation.tabs            # top-level sections as tabs
+    - navigation.tabs.sticky     # tabs stay visible while scrolling
+    - navigation.sections        # render sub-sections in sidebar
+    - navigation.expand          # expand all sections by default
+    - navigation.top             # "back to top" button
+    - navigation.indexes         # section index pages
+    - toc.follow                 # active TOC entry follows scroll
+    - search.suggest
+    - search.highlight
+    - content.code.copy          # copy button on every code block
+    - content.code.annotate      # code annotations
+    - content.tabs.link          # tabs are linked across pages
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            heading_level: 2
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+
+markdown_extensions:
+  # Standard extras
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  # PyMdown extensions
+  - pymdownx.details            # collapsible admonitions
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true     # Material-style tabs
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+  - Tutorials:
+    - tutorials/index.md
+    - "1 · Your First Dataset": tutorials/01-first-dataset.md
+    - "2 · Molecules & SMILES": tutorials/02-molecules.md
+    - "3 · Molecules on Surfaces": tutorials/03-surfaces.md
+    - "4 · Crystals & Defects": tutorials/04-crystals-defects.md
+    - "5 · Slabs & Strain": tutorials/05-slabs-strain.md
+    - "6 · 2D Materials": tutorials/06-2d-materials.md
+    - "7 · MACE-MP0 Sampling": tutorials/07-mace-mp0.md
+    - "8 · The Selection Funnel": tutorials/08-selection-funnel.md
+    - "9 · ASE · pymatgen · RDKit": tutorials/09-interop.md
+  - Concepts:
+    - concepts/index.md
+    - Architecture: concepts/architecture.md
+    - Geometry System: concepts/geometry.md
+    - Fragment Identity: concepts/fragments.md
+    - Provenance: concepts/provenance.md
+    - Selection Funnel: concepts/selection.md
+  - How-to Guides:
+    - how-to/index.md
+    - Write a Custom Builder: how-to/custom-builder.md
+    - Write a Custom Sampler: how-to/custom-sampler.md
+    - Use Your Own MACE Model: how-to/own-mace-model.md
+    - Manage Datasets: how-to/datasets.md
+  - Reference:
+    - reference/index.md
+    - CLI: reference/cli.md
+    - Config Schema: reference/config.md
+    - Python API: reference/api.md
+  - Roadmap: roadmap.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/traincraft
+
+extra_css:
+  - stylesheets/extra.css
