@@ -1,0 +1,69 @@
+[run]
+name = "hpc_leonardo_label"
+outdir = "runs"
+seed = 17
+# Full workflow dispatched to CINECA Leonardo as dependency-chained Slurm jobs.
+# Each stage `apptainer exec`s the right image; FHI-aims labels the selected
+# frames in the (private) dft container. Submit with:
+#   traincraft submit examples/19_hpc_leonardo_label.toml --dry-run   # render only
+#   traincraft submit examples/19_hpc_leonardo_label.toml             # sbatch on Leonardo
+# NOTE: edit account / partitions / sif_dir / binds for your allocation.
+
+[geometry.builder]
+type = "crystal"
+name = "Si"
+crystalstructure = "diamond"
+a = 5.43
+supercell = [2, 2, 2]
+
+# cheap exploration with a MACE foundation model (GPU/Booster)
+[calculator]
+type = "mace"
+model = "mace-mp0"
+device = "cuda"
+
+[sampling]
+type = "md"
+temperature = 800.0
+steps = 5000
+interval = 50
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 40
+
+# label the 40 survivors with FHI-aims (E/F/stress + polarizability via DFPT)
+[labeling.calculator]
+type = "fhi_aims"
+xc = "pbe"
+species_defaults = "tight"
+kpts = [4, 4, 4]
+properties = ["polarizability"]
+
+[dataset]
+path = "dataset"
+
+# ----------------------------------------------------------------------------
+# HPC dispatch
+[orchestration]
+engine = "slurm"
+
+[orchestration.slurm]
+account = "EUHPC_xxxxxxx"          # <-- your Leonardo account
+sif_dir = "$WORK/sif"              # where the .sif images live
+modules = ["apptainer"]
+binds   = ["$SCRATCH", "$WORK"]
+
+# sampling runs on the GPU Booster in the MACE image
+[orchestration.slurm.stages.sample]
+image     = "traincraft-mlip.sif"
+partition = "boost_usr_prod"
+gpus      = 1
+time      = "02:00:00"
+
+# labeling runs traincraft in core; FHI-aims runs in the dft image under srun
+[orchestration.slurm.stages.label]
+partition = "dcgp_usr_prod"
+nodes     = 2
+ntasks    = 224
+time      = "06:00:00"

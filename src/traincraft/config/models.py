@@ -523,6 +523,47 @@ class DatasetConfig(TCModel):
     format: Literal["extxyz"] = "extxyz"
 
 
+# --------------------------------------------------------------------- orchestration
+class SlurmStage(TCModel):
+    """Per-stage Slurm/Apptainer overrides (merged onto built-in defaults)."""
+
+    image: str | None = None  # .sif to `apptainer exec` (default depends on stage)
+    partition: str | None = None
+    nodes: int = 1
+    ntasks: int | None = None
+    cpus_per_task: int | None = None
+    gpus: int | None = None  # >0 adds --gpus and the apptainer `--nv` flag
+    time: str = "01:00:00"
+    mem: str | None = None
+    qos: str | None = None
+    extra_sbatch: list[str] = Field(default_factory=list)  # raw extra "#SBATCH ..." lines
+    env: dict[str, str] = Field(default_factory=dict)  # extra exports for this stage
+
+
+class SlurmConfig(TCModel):
+    account: str | None = None
+    sif_dir: str = "."  # directory holding the .sif images
+    modules: list[str] = Field(default_factory=list)  # `module load` names
+    binds: list[str] = Field(default_factory=list)  # apptainer --bind paths
+    # DFT engine commands injected into the label stage (container-agnostic plugins).
+    # `{binds}`/`{sif_dir}` are substituted; defaults launch the dft image under srun.
+    aims_command: str | None = None
+    pw_command: str | None = None
+    env: dict[str, str] = Field(default_factory=dict)  # global exports
+    stages: dict[str, SlurmStage] = Field(default_factory=dict)
+
+
+class OrchestrationConfig(TCModel):
+    engine: Literal["local", "slurm"] = "local"
+    slurm: SlurmConfig | None = None
+
+    @model_validator(mode="after")
+    def _slurm_needs_config(self) -> OrchestrationConfig:
+        if self.engine == "slurm" and self.slurm is None:
+            self.slurm = SlurmConfig()
+        return self
+
+
 # ------------------------------------------------------------------------------ root
 class TrainCraftConfig(TCModel):
     run: RunConfig = Field(default_factory=RunConfig)
@@ -532,3 +573,4 @@ class TrainCraftConfig(TCModel):
     selection: SelectionConfig | None = None
     labeling: LabelingConfig | None = None
     dataset: DatasetConfig | None = None
+    orchestration: OrchestrationConfig | None = None

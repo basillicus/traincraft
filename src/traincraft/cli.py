@@ -9,7 +9,7 @@ import typer
 
 from .config import dump_starter_config, load_config
 from .core import available
-from .orchestration import STAGE_ORDER, run_pipeline, run_stage
+from .orchestration import STAGE_ORDER, run_pipeline, run_stage, submit_slurm
 
 app = typer.Typer(
     add_completion=False,
@@ -25,13 +25,40 @@ def _setup_logging() -> None:
 
 @app.command()
 def run(config: Path = typer.Argument(..., exists=True, readable=True)) -> None:
-    """Run the entire workflow declared in CONFIG (a single TOML)."""
+    """Run the workflow in CONFIG. Routes to Slurm if [orchestration].engine="slurm"."""
     _setup_logging()
     cfg = load_config(config)
+    if cfg.orchestration is not None and cfg.orchestration.engine == "slurm":
+        jobs = submit_slurm(cfg, str(config))
+        typer.echo("Submitted Slurm pipeline:")
+        for job in jobs:
+            jid = f" (job {job.job_id})" if job.job_id else ""
+            typer.echo(f"  {job.stage}: {job.script}{jid}")
+        return
     summary = run_pipeline(cfg)
     typer.echo("Done:")
     for key, value in summary.items():
         typer.echo(f"  {key}: {value}")
+
+
+@app.command()
+def submit(
+    config: Path = typer.Argument(..., exists=True, readable=True),
+    dry_run: bool = typer.Option(False, "--dry-run", help="write sbatch scripts but don't submit"),
+) -> None:
+    """Render + submit the workflow as dependency-chained Slurm jobs (Apptainer)."""
+    _setup_logging()
+    cfg = load_config(config)
+    if cfg.orchestration is None or cfg.orchestration.slurm is None:
+        typer.echo("CONFIG has no [orchestration.slurm] section")
+        raise typer.Exit(code=1)
+    jobs = submit_slurm(cfg, str(config), dry_run=dry_run)
+    verb = "Rendered" if dry_run else "Submitted"
+    typer.echo(f"{verb} {len(jobs)} stage(s):")
+    for job in jobs:
+        dep = f" after {job.depends_on}" if job.depends_on else ""
+        jid = f" (job {job.job_id})" if job.job_id else ""
+        typer.echo(f"  {job.stage}{dep}: {job.script}{jid}")
 
 
 @app.command()
