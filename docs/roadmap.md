@@ -71,7 +71,9 @@ Label selected frames with energy, forces, stress, dipole, and polarizability.
   FHI-aims polarizability via DFPT (`dielectric` periodic / `polarizability` molecular,
   auto-selected). Run command **injected from the environment** so the plugins stay
   container-agnostic. QE polarizability raises `NotImplementedError` (needs a `ph.x` run).
-- 🔜 Level-of-theory provenance in the extxyz output tree + `manifest.json`
+- ✅ Labeling stage (`[labeling]`): labels the *selected* frames, tags them
+  `dft_labeled` with level of theory, writes `labeled_dft/` (`labeled.extxyz`,
+  `manifest.json`, per-frame work dirs). `examples/18`.
 - 🔜 Cost-aware labeling: polarizability flagged as the expensive task
 - 🔜 Production runs on **Leonardo** via the `traincraft-dft` container (see below)
 
@@ -86,7 +88,9 @@ the [`how-to/HPC on Leonardo`](how-to/hpc-leonardo.md) guide.
 - ✅ Architecture + three Apptainer `*.def` files (`containers/`): `traincraft-core`
   (CPU orchestrator), `traincraft-mlip` (GPU/Booster MACE), `traincraft-dft`
   (CPU/DCGP FHI-aims — private, licensed)
-- 🔜 `orchestration` executor config that renders `srun [--nv] apptainer exec` Slurm steps
+- ✅ Resumable per-stage execution (`traincraft stage`) + a **Slurm/Apptainer
+  executor** that renders dependency-chained sbatch scripts (`traincraft submit`,
+  `[orchestration]` config). `examples/19`.
 - 🔜 Build + validate the three images on Leonardo (single-node FHI-aims, then multi-node)
 
 ---

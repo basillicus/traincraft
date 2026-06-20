@@ -14,6 +14,7 @@ You don't need to read these to use TrainCraft, but they'll help you:
 |---|---|
 | [Architecture](architecture.md) | The full pipeline and plugin system |
 | [Geometry System](geometry.md) | Sources, builders, and transform composition |
+| [Calculators & DFT Labeling](calculators.md) | Exploration vs labeling; FHI-aims/QE, DFPT |
 | [Fragment Identity](fragments.md) | How atoms are grouped for MC sampling |
 | [Provenance](provenance.md) | How every frame records its history |
 | [Selection Funnel](selection.md) | The stages and their ordering |

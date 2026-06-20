@@ -98,6 +98,7 @@ nav:
     - getting-started/index.md
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
+    - "Full Workflow: Scratch → HPC": getting-started/end-to-end.md
   - Tutorials:
     - tutorials/index.md
     - "1 · Your First Dataset": tutorials/01-first-dataset.md
@@ -113,6 +114,7 @@ nav:
     - concepts/index.md
     - Architecture: concepts/architecture.md
     - Geometry System: concepts/geometry.md
+    - Calculators & DFT Labeling: concepts/calculators.md
     - Fragment Identity: concepts/fragments.md
     - Provenance: concepts/provenance.md
     - Selection Funnel: concepts/selection.md

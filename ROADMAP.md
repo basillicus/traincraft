@@ -108,27 +108,28 @@ Acceptance (met)
 
 ---
 
-## Phase 2 — DFT labeling with full property set
+## Phase 2 — DFT labeling with full property set  *(mostly done)*
 
 **Goal:** label E/F/stress + dipole + polarizability. **Production target is
 FHI-aims on CINECA Leonardo** (see "Packaging & HPC deployment" below).
 
 Deliverables
-- `calculators/dft.py` — QE and FHI-AIMS factories; SCF for E/F/stress; dipole
-  output; **polarizability via DFPT** (AIMS `DFPT dielectric`; QE `ph.x`).
-  FHI-aims is an ASE `FileIOCalculator`; its run command is **injected from the
-  environment** (`TRAINCRAFT_AIMS_COMMAND`, default `aims.x`) so the plugin stays
-  container-agnostic (DESIGN §20.3).
-- Labeled results written to extxyz with level-of-theory provenance.
-- Cost-aware labeling (polarizability flagged as the expensive task; selection
+- ✅ `calculators/dft.py` — QE and FHI-AIMS factories; SCF for E/F/stress; dipole
+  output; **polarizability via DFPT** (AIMS `dielectric`/`polarizability`; QE
+  needs `ph.x`, raises NotImplementedError for now). Command **injected from the
+  environment** (`TRAINCRAFT_AIMS_COMMAND`/`TRAINCRAFT_PW_COMMAND`) so the plugin
+  stays container-agnostic (DESIGN §20.3).
+- ✅ Labeling stage (`labeling.py` + `[labeling]`): labels the *selected* frames,
+  tags them `dft_labeled` with `level_of_theory`, writes `runs/<name>/labeled_dft/`
+  (`labeled.extxyz`, `manifest.json`, per-frame work dirs). `examples/18`.
+- 🔜 Cost-aware labeling (polarizability flagged as the expensive task; selection
   accounts for the cost).
-- `runs/<name>/labeled_dft/` tree + `manifest.json` (level-of-theory, counts).
 
 Acceptance
-- A selected frame is labeled with all requested properties and lands in
-  `labeled_dft/` with provenance; QE and AIMS paths verified on a tiny system.
-- FHI-aims path verified end-to-end inside `traincraft-dft.sif` (a tiny molecule,
-  single node) before scaling.
+- ✅ A selected frame is labeled and lands in `labeled_dft/` with provenance +
+  manifest (verified with EMT standing in for DFT; mechanics covered by tests).
+- 🔜 FHI-aims path verified end-to-end inside `traincraft-dft.sif` (a tiny
+  molecule, single node) before scaling.
 
 ---
 
@@ -144,17 +145,22 @@ Three images, dispatched as Slurm steps by the `core` orchestrator:
 - `traincraft-dft.sif` (CPU/DCGP) — **FHI-aims** (MPI/MKL/ScaLAPACK); private build.
 
 Deliverables
-- `containers/` — three Apptainer `*.def` files + README (build via fakeroot /
+- ✅ `containers/` — three Apptainer `*.def` files + README (build via fakeroot /
   off-cluster, then transfer the `.sif`; FHI-aims license/source kept out of the repo).
-- `orchestration/` executor config: per-stage `(image, partition, resources,
-  gpu?, mpi?)`; renders `srun [--nv] apptainer exec --bind … <image> <cmd>`.
-- Command-injection plumbing so `dft.py`/`mace` are container-agnostic.
-- FHI-aims hybrid-MPI binding (host MPI/libfabric/UCX) verified multi-node.
+- ✅ Resumable per-stage execution (`orchestration/stages.py` + `traincraft stage`)
+  and a **Slurm/Apptainer executor** (`orchestration/slurm.py` + `[orchestration]`):
+  renders dependency-chained sbatch scripts that `apptainer exec` the right image
+  per stage (`sample`→mlip `--nv`; `label`→core + injected `srun … dft.sif aims.x`).
+  `traincraft submit CONFIG [--dry-run]`; `examples/19`.
+- ✅ Command-injection plumbing so `dft.py`/`mace` are container-agnostic.
+- 🔜 FHI-aims hybrid-MPI binding (host MPI/libfabric/UCX) verified multi-node on
+  Leonardo (needs the real cluster; `TODO(leonardo)` markers in `dft.def`).
 
 Acceptance
-- `core` builds geometry and dispatches a GPU sampling step (`mlip.sif`) and a
-  multi-node FHI-aims label step (`dft.sif`) on Leonardo; results land in the
-  dataset with provenance, identical in shape to a local `emt` run.
+- ✅ `submit --dry-run` renders the full chained pipeline (geometry→…→dataset) with
+  correct images/resources/command-injection (covered by `test_slurm_executor`).
+- 🔜 End-to-end on Leonardo: GPU sampling (`mlip.sif`) + multi-node FHI-aims label
+  (`dft.sif`); results land in the dataset, identical in shape to a local run.
 
 ---
 
