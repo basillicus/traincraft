@@ -9,7 +9,7 @@ import typer
 
 from .config import dump_starter_config, load_config
 from .core import available
-from .orchestration import run_pipeline
+from .orchestration import STAGE_ORDER, run_pipeline, run_stage
 
 app = typer.Typer(
     add_completion=False,
@@ -32,6 +32,23 @@ def run(config: Path = typer.Argument(..., exists=True, readable=True)) -> None:
     typer.echo("Done:")
     for key, value in summary.items():
         typer.echo(f"  {key}: {value}")
+
+
+@app.command()
+def stage(
+    name: str = typer.Argument(..., help=f"one of: {', '.join(STAGE_ORDER)}"),
+    config: Path = typer.Argument(..., exists=True, readable=True),
+    force: bool = typer.Option(False, "--force", help="recompute even if the artifact exists"),
+) -> None:
+    """Run a single pipeline stage standalone (reads/writes workspace artifacts).
+
+    This is what the Slurm executor dispatches as separate jobs; each stage picks
+    up the previous stage's artifact from the run workspace.
+    """
+    _setup_logging()
+    cfg = load_config(config)
+    frames = run_stage(name, cfg, force=force)
+    typer.echo(f"stage '{name}': {len(frames)} frames")
 
 
 @app.command()
