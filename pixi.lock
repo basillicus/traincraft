@@ -5087,7 +5087,7 @@ packages:
 - pypi: ./
   name: traincraft
   version: 0.1.0
-  sha256: aed910eed90fc6635b5ae634b76a0d32423ab4de8f465fc6221d92417ec77320
+  sha256: 63d5226156e8e20123d9d005b043e793185ed63313b713bc888a53ef8237e391
   requires_dist:
   - ase>=3.22
   - numpy>=1.23
