@@ -9,12 +9,24 @@ Image map (overridable per stage in ``[orchestration.slurm.stages.*]``):
     sample -> traincraft-mlip.sif  (GPU/Booster, --nv)
     others -> traincraft-core.sif  (CPU)
 
-The ``label`` stage runs ``traincraft`` in the *core* image but injects the DFT
-engine command (``TRAINCRAFT_AIMS_COMMAND`` / ``TRAINCRAFT_PW_COMMAND``) so the
-heavy MPI binary runs in its own DFT image under ``srun`` — keeping the calculator
-plugins container-agnostic (DESIGN §20.3). The defaults point FHI-aims at
-``traincraft-dft.sif`` and Quantum ESPRESSO (open source) at ``traincraft-qe.sif``;
-both are overridable via ``[orchestration.slurm].aims_command``/``pw_command``.
+Two orthogonal axes make this portable across clusters (``[orchestration.slurm]``):
+
+* ``runtime`` — ``apptainer`` (our images) or ``native`` (binaries already on the
+  host: site modules / conda / EasyBuild). ``native`` drops the container wrapper,
+  so the same DAG runs on machines where bind-mounting our images is awkward
+  (e.g. Cray, where the site MPI/binaries are the path of least resistance).
+* ``mpi`` — the Slurm MPI plugin for the multi-node DFT launch: ``pmix`` for
+  InfiniBand+Slurm (Leonardo), ``cray_shasta`` for Cray/Slingshot (LUMI has no
+  pmix), ``pmi2`` as a portable fallback. There is no universal MPI plugin —
+  ``srun --mpi=list`` on the target cluster is the ground truth.
+
+The ``label`` stage runs ``traincraft`` in the *core* image (or natively) but
+injects the DFT engine command (``TRAINCRAFT_AIMS_COMMAND`` / ``TRAINCRAFT_PW_COMMAND``)
+so the heavy MPI binary launches under ``srun --mpi=<plugin>`` — keeping the
+calculator plugins container-agnostic (DESIGN §20.3). With ``runtime=apptainer``
+the command wraps FHI-aims in ``traincraft-dft.sif`` and Quantum ESPRESSO in
+``traincraft-qe.sif``; with ``runtime=native`` it calls the bare binary. Both are
+fully overridable via ``[orchestration.slurm].aims_command``/``pw_command``.
 """
 
 from __future__ import annotations
@@ -40,8 +52,6 @@ _DEFAULT_IMAGE = {
     "dataset": "traincraft-core.sif",
 }
 _DEFAULT_GPUS = {"sample": 1}
-_DEFAULT_AIMS_CMD = "srun apptainer exec{binds} {sif_dir}/traincraft-dft.sif aims.x"
-_DEFAULT_PW_CMD = "srun apptainer exec{binds} {sif_dir}/traincraft-qe.sif pw.x"
 
 _JOB_ID_RE = re.compile(r"Submitted batch job (\d+)")
 
@@ -56,6 +66,32 @@ class StageJob:
 
 def _bind_flags(binds: list[str]) -> str:
     return "".join(f" --bind {b}" for b in binds)
+
+
+def _launch_prefix(mpi: str) -> str:
+    """``srun`` with the cluster's MPI plugin (omitted when ``mpi='none'``)."""
+    return "srun" if mpi == "none" else f"srun --mpi={mpi}"
+
+
+def _dft_command(binary: str, image: str, slurm, runtime: str, mpi: str) -> str:
+    """Compose the injected DFT engine command for the requested runtime.
+
+    apptainer: ``srun --mpi=<plugin> apptainer exec <binds> <sif> <binary>``
+    native:    ``srun --mpi=<plugin> <binary>``  (binary from host modules/conda)
+    """
+    prefix = _launch_prefix(mpi)
+    if runtime == "native":
+        return f"{prefix} {binary}"
+    return f"{prefix} apptainer exec{_bind_flags(slurm.binds)} {slurm.sif_dir}/{image} {binary}"
+
+
+def _stage_exec(stage, image, runtime, gpus, slurm, config_path) -> str:
+    """The line that runs ``traincraft stage`` — wrapped in our image or bare."""
+    inner = f"traincraft stage {stage} {config_path}"
+    if runtime == "native":
+        return inner
+    nv = " --nv" if gpus else ""
+    return f"apptainer exec{nv}{_bind_flags(slurm.binds)} {slurm.sif_dir}/{image} {inner}"
 
 
 def _sbatch_header(stage, st, slurm, run_name, ws: Workspace) -> list[str]:
@@ -93,24 +129,30 @@ def render_sbatch(stage: str, config: TrainCraftConfig, ws: Workspace, config_pa
     st = slurm.stages.get(stage, SlurmStage())
     image = st.image or _DEFAULT_IMAGE[stage]
     gpus = st.gpus if st.gpus is not None else _DEFAULT_GPUS.get(stage)
+    runtime = st.runtime or slurm.runtime
+    mpi = st.mpi or slurm.mpi
     binds = _bind_flags(slurm.binds)
 
     body = ["", "set -euo pipefail"]
     body += [f"module load {m}" for m in slurm.modules]
+    body += list(slurm.pre_commands)
+    body += list(st.pre_commands)
     body += [f'export {k}="{v}"' for k, v in slurm.env.items()]
     body += [f'export {k}="{v}"' for k, v in st.env.items()]
 
     if stage == "label":
-        aims = (slurm.aims_command or _DEFAULT_AIMS_CMD).format(binds=binds, sif_dir=slurm.sif_dir)
-        pw = (slurm.pw_command or _DEFAULT_PW_CMD).format(binds=binds, sif_dir=slurm.sif_dir)
+        if slurm.aims_command:
+            aims = slurm.aims_command.format(binds=binds, sif_dir=slurm.sif_dir, mpi=mpi)
+        else:
+            aims = _dft_command("aims.x", slurm.aims_image, slurm, runtime, mpi)
+        if slurm.pw_command:
+            pw = slurm.pw_command.format(binds=binds, sif_dir=slurm.sif_dir, mpi=mpi)
+        else:
+            pw = _dft_command("pw.x", slurm.qe_image, slurm, runtime, mpi)
         body.append(f'export TRAINCRAFT_AIMS_COMMAND="{aims}"')
         body.append(f'export TRAINCRAFT_PW_COMMAND="{pw}"')
 
-    nv = " --nv" if gpus else ""
-    exec_line = (
-        f"apptainer exec{nv}{binds} {slurm.sif_dir}/{image} "
-        f"traincraft stage {stage} {config_path}"
-    )
+    exec_line = _stage_exec(stage, image, runtime, gpus, slurm, config_path)
     body += ["", exec_line, ""]
 
     header = _sbatch_header(stage, st, slurm, config.run.name, ws)

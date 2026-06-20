@@ -255,7 +255,10 @@ time      = "06:00:00"
 ```
 
 You do **not** set the DFT command here — the executor generates it, pointing at
-`traincraft-qe.sif` (or `traincraft-dft.sif` for FHI-aims) under `srun`.
+`traincraft-qe.sif` (or `traincraft-dft.sif` for FHI-aims) under `srun --mpi=<plugin>`.
+Two knobs adapt this to any cluster: `runtime` (`apptainer` vs `native` host
+binaries) and `mpi` (`pmix` on InfiniBand/Slurm, `cray_shasta` on Cray, `pmi2`
+fallback — check `srun --mpi=list`). See [Run on HPC](../how-to/hpc.md).
 
 ---
 

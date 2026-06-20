@@ -536,7 +536,11 @@ class SlurmStage(TCModel):
     time: str = "01:00:00"
     mem: str | None = None
     qos: str | None = None
+    # Override the global runtime/MPI plugin for this stage (None = inherit).
+    runtime: Literal["apptainer", "native"] | None = None
+    mpi: Literal["pmix", "pmi2", "cray_shasta", "none"] | None = None
     extra_sbatch: list[str] = Field(default_factory=list)  # raw extra "#SBATCH ..." lines
+    pre_commands: list[str] = Field(default_factory=list)  # shell lines before the exec
     env: dict[str, str] = Field(default_factory=dict)  # extra exports for this stage
 
 
@@ -545,10 +549,22 @@ class SlurmConfig(TCModel):
     sif_dir: str = "."  # directory holding the .sif images
     modules: list[str] = Field(default_factory=list)  # `module load` names
     binds: list[str] = Field(default_factory=list)  # apptainer --bind paths
-    # DFT engine commands injected into the label stage (container-agnostic plugins).
-    # `{binds}`/`{sif_dir}` are substituted; defaults launch the dft image under srun.
+    # How to reach the binaries: our Apptainer images, or binaries already on the
+    # host (site modules / conda / EasyBuild). `native` skips the container wrapper.
+    runtime: Literal["apptainer", "native"] = "apptainer"
+    # Slurm MPI plugin for the multi-node DFT launch. `pmix` for InfiniBand+Slurm
+    # clusters (e.g. Leonardo); `cray_shasta` for Cray/Slingshot (e.g. LUMI, which
+    # has no pmix); `pmi2` as a portable fallback. Check `srun --mpi=list` on site.
+    mpi: Literal["pmix", "pmi2", "cray_shasta", "none"] = "pmix"
+    # DFT images used when runtime="apptainer".
+    aims_image: str = "traincraft-dft.sif"
+    qe_image: str = "traincraft-qe.sif"
+    # Full overrides for the DFT engine commands injected into the label stage
+    # (container-agnostic plugins). `{binds}`/`{sif_dir}`/`{mpi}` are substituted;
+    # when unset the command is composed from runtime + mpi + the images above.
     aims_command: str | None = None
     pw_command: str | None = None
+    pre_commands: list[str] = Field(default_factory=list)  # shell lines before every exec
     env: dict[str, str] = Field(default_factory=dict)  # global exports
     stages: dict[str, SlurmStage] = Field(default_factory=dict)
 

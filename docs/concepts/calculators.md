@@ -62,8 +62,9 @@ works locally and inside a container on HPC (see
 | `TRAINCRAFT_PW_PSEUDO_DIR` / `ESPRESSO_PSEUDO` | — | `qe` pseudopotentials |
 
 On HPC the Slurm executor sets these for you, e.g.
-`TRAINCRAFT_PW_COMMAND="srun apptainer exec … traincraft-qe.sif pw.x"` — you never
-hard-code the command.
+`TRAINCRAFT_PW_COMMAND="srun --mpi=pmix apptainer exec … traincraft-qe.sif pw.x"` —
+you never hard-code the command (the MPI plugin and container/native wrapper come
+from `[orchestration.slurm]`; see [Run on HPC](../how-to/hpc.md)).
 
 ### `fhi_aims` (FHI-aims — the reference engine)
 ```toml

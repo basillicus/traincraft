@@ -76,6 +76,8 @@ def test_label_stage_injects_dft_command_and_core_image(tmp_path):
     # the open-source QE engine is injected too, pointing at its own image
     assert "export TRAINCRAFT_PW_COMMAND=" in text
     assert "traincraft-qe.sif pw.x" in text
+    # default MPI plugin is pmix (InfiniBand+Slurm), launched under srun
+    assert "srun --mpi=pmix apptainer exec" in text
     assert "#SBATCH --nodes=2" in text
     assert "#SBATCH --ntasks=224" in text
     assert "#SBATCH --account=ACC_1" in text
@@ -86,3 +88,54 @@ def test_geometry_stage_defaults_to_core_image(tmp_path):
     text = (tmp_path / "hpc" / "slurm" / "geometry.sbatch").read_text()
     assert "traincraft-core.sif" in text
     assert "--nv" not in text  # no GPU on the geometry stage
+
+
+def _cray_native_cfg(tmp_path):
+    """A Cray-style cluster (LUMI): native runtime, cray_shasta, no pmix/containers."""
+    return TrainCraftConfig(
+        run=RunConfig(name="lumi", outdir=str(tmp_path)),
+        geometry=GeometryConfig(builder=CrystalBuilder(name="Cu", crystalstructure="fcc", a=3.6)),
+        calculator=EmtCalc(),
+        sampling=MdSampling(steps=10),
+        selection=SelectionConfig(),
+        labeling=LabelingConfig(calculator=FhiAimsCalc(xc="pbe")),
+        dataset=DatasetConfig(),
+        orchestration=OrchestrationConfig(
+            engine="slurm",
+            slurm=SlurmConfig(
+                account="proj_465",
+                runtime="native",
+                mpi="cray_shasta",
+                modules=["LUMI/24.03", "cray-mpich"],
+                pre_commands=["source $HOME/tc-venv/bin/activate"],
+                stages={
+                    "label": SlurmStage(
+                        partition="standard",
+                        nodes=2,
+                        ntasks=256,
+                        pre_commands=["module load fhi-aims/240507"],
+                    ),
+                },
+            ),
+        ),
+    )
+
+
+def test_native_runtime_drops_apptainer_wrapper(tmp_path):
+    submit_slurm(_cray_native_cfg(tmp_path), "myconfig.toml", dry_run=True)
+    geo = (tmp_path / "lumi" / "slurm" / "geometry.sbatch").read_text()
+    # native: the binary/orchestrator runs directly, no `apptainer exec`, no .sif
+    assert "apptainer exec" not in geo
+    assert ".sif" not in geo
+    assert "traincraft stage geometry" in geo
+    assert "source $HOME/tc-venv/bin/activate" in geo
+
+
+def test_native_label_uses_cray_mpi_and_bare_binary(tmp_path):
+    submit_slurm(_cray_native_cfg(tmp_path), "myconfig.toml", dry_run=True)
+    text = (tmp_path / "lumi" / "slurm" / "label.sbatch").read_text()
+    # Cray MPI plugin, bare site binary (no container), site FHI-aims module loaded
+    assert 'export TRAINCRAFT_AIMS_COMMAND="srun --mpi=cray_shasta aims.x"' in text
+    assert 'export TRAINCRAFT_PW_COMMAND="srun --mpi=cray_shasta pw.x"' in text
+    assert "apptainer exec" not in text
+    assert "module load fhi-aims/240507" in text

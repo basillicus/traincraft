@@ -1,0 +1,74 @@
+[run]
+name = "hpc_lumi_native"
+outdir = "runs"
+seed = 17
+# Same workflow as example 19, dispatched to a Cray cluster (LUMI) WITHOUT our
+# Apptainer images: it uses the site's own modules (cray-mpich + EasyBuild
+# FHI-aims / QE). This is the path of least resistance on Cray/Slingshot, where
+# `srun --mpi=list` shows cray_shasta / pmi2 but NO pmix. Submit with:
+#   traincraft submit examples/20_hpc_lumi_native.toml --dry-run   # render only
+#   traincraft submit examples/20_hpc_lumi_native.toml             # sbatch on LUMI
+# NOTE: edit account / partitions / module names for your allocation.
+
+[geometry.builder]
+type = "crystal"
+name = "Si"
+crystalstructure = "diamond"
+a = 5.43
+supercell = [2, 2, 2]
+
+# cheap exploration with a MACE foundation model (GPU partition)
+[calculator]
+type = "mace"
+model = "mace-mp0"
+device = "cuda"
+
+[sampling]
+type = "md"
+temperature = 800.0
+steps = 5000
+interval = 50
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 40
+
+# label the survivors with the site's FHI-aims build (E/F/stress + polarizability)
+[labeling.calculator]
+type = "fhi_aims"
+xc = "pbe"
+species_defaults = "tight"
+kpts = [4, 4, 4]
+properties = ["polarizability"]
+
+[dataset]
+path = "dataset"
+
+# ----------------------------------------------------------------------------
+# HPC dispatch — native runtime, Cray MPI plugin
+[orchestration]
+engine = "slurm"
+
+[orchestration.slurm]
+account = "project_465xxxxxx"      # <-- your LUMI project
+runtime = "native"                 # use host binaries, not our .sif images
+mpi     = "cray_shasta"            # LUMI has no pmix; cray_shasta drives Slingshot
+binds   = []                       # no containers -> nothing to bind
+# `module load` lines providing traincraft + the DFT engine on the host:
+modules = ["LUMI/24.03", "partition/C", "cray-mpich"]
+# anything else needed before each stage (e.g. activate a conda/venv with traincraft):
+pre_commands = ["source $HOME/traincraft-venv/bin/activate"]
+
+# MACE sampling on a GPU partition (still native: the site's PyTorch/MACE module)
+[orchestration.slurm.stages.sample]
+partition = "standard-g"
+gpus      = 1
+time      = "02:00:00"
+
+# DFT labeling on a CPU partition; aims.x comes from a site/EasyBuild module
+[orchestration.slurm.stages.label]
+partition    = "standard"
+nodes        = 2
+ntasks       = 256
+time         = "06:00:00"
+pre_commands = ["module load fhi-aims/240507"]   # site's FHI-aims build

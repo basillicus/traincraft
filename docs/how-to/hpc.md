@@ -30,12 +30,12 @@ Slurm job that `apptainer exec`s the right image and runs `traincraft stage <nam
 
 ```bash
 # GPU sampling/training — traincraft runs inside the mlip image
-srun --nv apptainer exec --bind "$SCRATCH" traincraft-mlip.sif \
+apptainer exec --nv --bind "$SCRATCH" traincraft-mlip.sif \
      traincraft stage sample config.toml
 
 # DFT label — traincraft runs in core; the engine binary runs in its DFT image
 #   under srun via the injected command (QE shown; FHI-aims is identical):
-export TRAINCRAFT_PW_COMMAND="srun apptainer exec --bind $SCRATCH traincraft-qe.sif pw.x"
+export TRAINCRAFT_PW_COMMAND="srun --mpi=pmix apptainer exec --bind $SCRATCH traincraft-qe.sif pw.x"
 apptainer exec --bind "$SCRATCH" traincraft-core.sif traincraft stage label config.toml
 ```
 
@@ -68,6 +68,8 @@ engine = "slurm"
 
 [orchestration.slurm]
 account = "<your-account>"        # your scheduler account/project
+runtime = "apptainer"            # "apptainer" (our images) or "native" (host binaries)
+mpi     = "pmix"                  # Slurm MPI plugin — see "Picking the MPI plugin"
 sif_dir = "$WORK/sif"             # where the .sif images live
 modules = ["apptainer"]           # `module load` lines for your site
 binds   = ["$SCRATCH", "$WORK"]   # filesystems to bind into the containers
@@ -91,22 +93,54 @@ traincraft submit config.toml --dry-run   # render + inspect the sbatch scripts
 traincraft submit config.toml             # sbatch, dependency-chained
 ```
 
-## MPI across nodes
+## Two knobs that make it portable: `runtime` and `mpi`
 
-Single-node DFT works out of the box. For **multi-node**, use the hybrid model:
-the engine in the container is launched by the host `srun` (PMI), and the host
-MPI / `libfabric` / UCX are bind-mounted so the DFT code drives the real
-interconnect. A bundled MPI alone will not scale across nodes. Validate single-node
-first, then multi-node.
+There is **no universal MPI setup** — the cluster decides. TrainCraft exposes this
+as two independent config switches instead of baking in assumptions:
 
-## Worked example: CINECA Leonardo
+| Switch | Values | What it controls |
+|--------|--------|------------------|
+| `runtime` | `apptainer` \| `native` | Reach binaries via **our images**, or via **host binaries** already installed (site modules / conda / EasyBuild). `native` drops the container wrapper entirely. |
+| `mpi` | `pmix` \| `cray_shasta` \| `pmi2` \| `none` | The Slurm MPI plugin used to launch the multi-node DFT step (`srun --mpi=<plugin>`). |
 
-Leonardo has a GPU **Booster** (A100) and a CPU **DCGP** partition. A typical
-mapping:
+Both can be overridden per stage in `[orchestration.slurm.stages.*]`.
+
+### Picking the MPI plugin
+
+Run this on the target cluster — it is the ground truth:
+
+```bash
+srun --mpi=list
+```
+
+- **`pmix` present** (InfiniBand + Slurm, e.g. Leonardo) → `mpi = "pmix"`. Our
+  images carry a self-contained OpenMPI+UCX+PMIx, so Slurm does the wire-up and no
+  host MPI is needed.
+- **No `pmix`, Cray/Slingshot** (e.g. LUMI shows only `cray_shasta` / `pmi2`) →
+  `mpi = "cray_shasta"`. On Cray the path of least resistance is `runtime =
+  "native"` with the site's `cray-mpich` and its FHI-aims/QE module, rather than
+  fighting ABI translation inside a container.
+- **Anything else** → `mpi = "pmi2"` is the portable fallback.
+
+### When to use `runtime = "native"`
+
+Use it when the cluster already provides tuned binaries (a site/EasyBuild FHI-aims
+or QE, or your own conda/venv), or when bind-mounting containers is awkward (Cray).
+TrainCraft then renders bare `srun --mpi=<plugin> aims.x` and runs `traincraft
+stage …` directly — put the needed `module load` / `source activate` lines in
+`modules` and `pre_commands`. See the LUMI example below.
+
+## Worked example: CINECA Leonardo (Apptainer + PMIx)
+
+Leonardo has a GPU **Booster** (A100) and a CPU **DCGP** partition, and
+`srun --mpi=list` shows `pmix`. So: our images, PMIx launch. Full file:
+[`examples/19_hpc_leonardo_label.toml`](https://github.com/your-org/traincraft/blob/main/examples/19_hpc_leonardo_label.toml).
 
 ```toml
 [orchestration.slurm]
 account = "EUHPC_xxxxxxx"
+runtime = "apptainer"
+mpi     = "pmix"
 sif_dir = "$WORK/sif"
 modules = ["apptainer"]
 binds   = ["$SCRATCH", "$WORK"]
@@ -122,7 +156,36 @@ nodes = 2
 ntasks = 224
 ```
 
-The same config shape works on any other Slurm cluster — change the account,
-partitions, modules, and binds to match your site. For Leonardo specifically, fill
-the `TODO(leonardo)` markers in `containers/traincraft-dft.def` (compiler/MPI/
-module versions) when building the FHI-aims image; the QE image needs no such tuning.
+Fill the `TODO(site)` markers in `containers/traincraft-dft.def` (target arch, MKL
+link line) when building the FHI-aims image.
+
+## Worked example: LUMI (native + cray_shasta)
+
+LUMI is a Cray EX: Slingshot interconnect, and `srun --mpi=list` shows **no
+pmix** (only `cray_shasta` / `pmi2`). The clean path is `runtime = "native"` using
+the site's `cray-mpich` and FHI-aims/QE modules. Full file:
+[`examples/20_hpc_lumi_native.toml`](https://github.com/your-org/traincraft/blob/main/examples/20_hpc_lumi_native.toml).
+
+```toml
+[orchestration.slurm]
+account = "project_465xxxxxx"
+runtime = "native"                 # use host binaries, not our .sif images
+mpi     = "cray_shasta"            # no pmix on Cray; this drives Slingshot
+binds   = []
+modules = ["LUMI/24.03", "partition/C", "cray-mpich"]
+pre_commands = ["source $HOME/traincraft-venv/bin/activate"]  # traincraft on PATH
+
+[orchestration.slurm.stages.sample]
+partition = "standard-g"
+gpus = 1
+
+[orchestration.slurm.stages.label]
+partition = "standard"
+nodes = 2
+ntasks = 256
+pre_commands = ["module load fhi-aims/240507"]   # the site's FHI-aims build
+```
+
+This renders bare `srun --mpi=cray_shasta aims.x` with no container — the two knobs
+(`runtime`, `mpi`) are the only things that change between Leonardo and LUMI; the
+science config is identical.

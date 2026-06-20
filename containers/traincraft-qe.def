@@ -1,25 +1,85 @@
 Bootstrap: docker
-From: condaforge/miniforge3:latest
+From: ubuntu:22.04
 
 # traincraft-qe — open-source DFT labeling image (Quantum ESPRESSO).
 #
-# The fully open, no-license alternative to the FHI-aims image: Quantum ESPRESSO
-# (pw.x, and ph.x for linear response) installed from conda-forge. Like the
-# FHI-aims image it holds ONLY the DFT engine — no Python, no traincraft. It is
-# invoked as a bare MPI binary by traincraft-core's `qe` calculator, with the run
-# command injected from $TRAINCRAFT_PW_COMMAND (DESIGN §20.3).
+# The fully open, no-license alternative to the FHI-aims image. Everything is
+# COMPILED FROM SOURCE — UCX + PMIx + OpenMPI + Quantum ESPRESSO — so the binaries
+# are tuned for the target CPU and linked against a real UCX (RDMA over the host
+# interconnect), not a generic prebuilt stack. It holds ONLY the DFT engine — no
+# Python, no traincraft. traincraft-core's `qe` calculator writes the inputs and
+# parses the outputs; the run command is injected via $TRAINCRAFT_PW_COMMAND.
 #
-# MPI: conda-forge ships an MPI with QE. For single-node this works out of the
-# box; for multi-node on an HPC use the hybrid model (bind the host MPI/libfabric
-# so QE drives the real interconnect) exactly as for the FHI-aims image.
+# MPI model (self-contained, PMIx launch):
+#   srun --mpi=pmix apptainer exec traincraft-qe.sif pw.x
+# Slurm's slurmstepd is the PMIx server; the container's OpenMPI is the client, so
+# NO host MPI is needed. UCX (built in) drives the interconnect; only the IB/RDMA
+# device nodes are exposed (apptainer does this by default). On Cray/Slingshot
+# clusters (LUMI: no pmix) prefer runtime="native" with the site's cray-mpich
+# instead of this image — see docs/how-to/hpc.md.
+
+%arguments
+    UCX_VERSION=1.17.0
+    PMIX_VERSION=5.0.3
+    OPENMPI_VERSION=5.0.5
+    QE_VERSION=7.3.1
 
 %post
     set -eux
-    mamba install -y -n base -c conda-forge qe
-    mamba clean -ay
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential gfortran cmake git wget ca-certificates \
+        python3 libfftw3-dev libopenblas-dev libscalapack-openmpi-dev \
+        librdmacm-dev libibverbs-dev libnuma-dev
+    rm -rf /var/lib/apt/lists/*
+
+    # TODO(site): add -march=native (or the cluster's arch, e.g. -march=sapphirerapids
+    # / -march=znver3) to CFLAGS/FFLAGS below once you know the target CPU. The whole
+    # point of compiling from source is this tuning; conda-forge's generic build is
+    # exactly what we are avoiding.
+    export CFLAGS="-O3" FCFLAGS="-O3" FFLAGS="-O3"
+
+    cd /tmp
+
+    # --- UCX: RDMA transport for the interconnect -------------------------------
+    wget -q https://github.com/openucx/ucx/releases/download/v{{ UCX_VERSION }}/ucx-{{ UCX_VERSION }}.tar.gz
+    tar xf ucx-{{ UCX_VERSION }}.tar.gz && cd ucx-{{ UCX_VERSION }}
+    ./configure --prefix=/opt/ucx --enable-optimizations --disable-logging \
+        --disable-debug --without-go --without-java
+    make -j"$(nproc)" && make install
+    cd /tmp && rm -rf ucx-{{ UCX_VERSION }}*
+
+    # --- PMIx: process wire-up, matched to Slurm's PMIx server ------------------
+    wget -q https://github.com/openpmix/openpmix/releases/download/v{{ PMIX_VERSION }}/pmix-{{ PMIX_VERSION }}.tar.gz
+    tar xf pmix-{{ PMIX_VERSION }}.tar.gz && cd pmix-{{ PMIX_VERSION }}
+    ./configure --prefix=/opt/pmix
+    make -j"$(nproc)" && make install
+    cd /tmp && rm -rf pmix-{{ PMIX_VERSION }}*
+
+    # --- OpenMPI: built against UCX + PMIx, launchable by `srun --mpi=pmix` ------
+    wget -q https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-{{ OPENMPI_VERSION }}.tar.gz
+    tar xf openmpi-{{ OPENMPI_VERSION }}.tar.gz && cd openmpi-{{ OPENMPI_VERSION }}
+    ./configure --prefix=/opt/openmpi \
+        --with-ucx=/opt/ucx \
+        --with-pmix=/opt/pmix \
+        --with-slurm \
+        --enable-mca-no-build=btl-uct
+    make -j"$(nproc)" && make install
+    cd /tmp && rm -rf openmpi-{{ OPENMPI_VERSION }}*
+    export PATH=/opt/openmpi/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib
+
+    # --- Quantum ESPRESSO: pw.x (+ ph.x for linear response) --------------------
+    wget -q https://gitlab.com/QEF/q-e/-/archive/qe-{{ QE_VERSION }}/q-e-qe-{{ QE_VERSION }}.tar.gz
+    tar xf q-e-qe-{{ QE_VERSION }}.tar.gz && cd q-e-qe-{{ QE_VERSION }}
+    ./configure MPIF90=mpif90 --enable-parallel --with-scalapack=yes
+    make -j"$(nproc)" pw ph
+    make install PREFIX=/opt/qe || (install -d /opt/qe/bin && cp bin/* /opt/qe/bin/)
+    cd /tmp && rm -rf q-e-qe-{{ QE_VERSION }}*
 
 %environment
-    export PATH=/opt/conda/bin:$PATH
+    export PATH=/opt/qe/bin:/opt/openmpi/bin:/opt/pmix/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib:$LD_LIBRARY_PATH
     # Point QE at your pseudopotentials at runtime (bind the dir in, or set in TOML):
     #   export ESPRESSO_PSEUDO=/path/to/pseudo   (bound via apptainer --bind)
 
@@ -28,11 +88,12 @@ From: condaforge/miniforge3:latest
 
 %labels
     org.traincraft.image qe
-    org.traincraft.target cpu-mpi
+    org.traincraft.target cpu-mpi-pmix
     org.traincraft.license open-source
 
 %help
-    Quantum ESPRESSO worker (open source). Launched by srun for host-PMI:
-      srun apptainer exec --bind "$SCRATCH",<pseudo-dir> traincraft-qe.sif pw.x
+    Quantum ESPRESSO worker (open source, compiled from source). Self-contained
+    OpenMPI+UCX+PMIx — launch with Slurm's PMIx, no host MPI needed:
+      srun --mpi=pmix apptainer exec --bind "$SCRATCH",<pseudo-dir> traincraft-qe.sif pw.x
     Inputs are written, and outputs parsed, by traincraft-core's `qe` calculator
     (TRAINCRAFT_PW_COMMAND). No license required.
