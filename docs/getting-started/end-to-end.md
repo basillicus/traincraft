@@ -306,5 +306,5 @@ ls $WORK/runs/<run-name>/
 ```
 
 `dataset.extxyz` is ready for MACE training (Phase 3). You have gone from an
-empty checkout to a DFT-labeled dataset produced on Leonardo — exploring cheaply,
-labeling selectively, with every frame's provenance recorded.
+empty checkout to a DFT-labeled dataset produced on an HPC cluster — exploring
+cheaply, labeling selectively, with every frame's provenance recorded.

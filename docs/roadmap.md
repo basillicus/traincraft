@@ -75,23 +75,28 @@ Label selected frames with energy, forces, stress, dipole, and polarizability.
   `dft_labeled` with level of theory, writes `labeled_dft/` (`labeled.extxyz`,
   `manifest.json`, per-frame work dirs). `examples/18`.
 - 🔜 Cost-aware labeling: polarizability flagged as the expensive task
-- 🔜 Production runs on **Leonardo** via the `traincraft-dft` container (see below)
+- 🔜 Production runs on any Slurm cluster via the DFT container (or `runtime=native`)
 
 ---
 
-## 🟡 Cross-cutting — Packaging & HPC Deployment (Leonardo)
+## 🟡 Cross-cutting — Packaging & HPC Deployment (any Slurm cluster)
 
-Run the real workflow on CINECA Leonardo via **Apptainer**. See
+Run the real workflow on **any Slurm cluster** via **Apptainer** (or the cluster's
+own binaries). Nothing is site-specific in the code. See
 [`DESIGN.md` §20](https://github.com/your-org/traincraft/blob/main/DESIGN.md) and
 the [Run on HPC (Slurm + Apptainer)](how-to/hpc.md) guide.
 
-- ✅ Architecture + three Apptainer `*.def` files (`containers/`): `traincraft-core`
-  (CPU orchestrator), `traincraft-mlip` (GPU/Booster MACE), `traincraft-dft`
-  (CPU/DCGP FHI-aims — private, licensed)
-- ✅ Resumable per-stage execution (`traincraft stage`) + a **Slurm/Apptainer
+- ✅ Architecture + four Apptainer `*.def` files (`containers/`): `traincraft-core`
+  (CPU orchestrator), `traincraft-mlip` (GPU MACE), `traincraft-qe` (QE, open
+  source), `traincraft-dft` (FHI-aims — private, licensed). DFT images are
+  **compiled from source** (self-contained UCX+PMIx+OpenMPI).
+- ✅ Resumable per-stage execution (`traincraft stage`) + a **portable Slurm
   executor** that renders dependency-chained sbatch scripts (`traincraft submit`,
-  `[orchestration]` config). `examples/19`.
-- 🔜 Build + validate the three images on Leonardo (single-node FHI-aims, then multi-node)
+  `[orchestration]` config) with two cluster-agnostic knobs: `runtime`
+  (`apptainer` images | `native` host binaries) and `mpi`
+  (`pmix`|`cray_shasta`|`pmi2`|`none`). `examples/19` (Leonardo, apptainer+pmix),
+  `examples/20` (LUMI, native+cray_shasta).
+- 🔜 Build + validate the images on a real cluster (single-node DFT, then multi-node)
 
 ---
 
@@ -144,7 +149,7 @@ graph TD
     P1B["✅ Phase 1 Ch.2<br/>Geometry breadth"]
     P1C["✅ Phase 1 Ch.3<br/>providers, liquid, intercalation"]
     P2["🟡 Phase 2<br/>DFT labeling"]
-    HPC["🟡 Containers + HPC<br/>Leonardo / FHI-aims"]
+    HPC["🟡 Containers + HPC<br/>any Slurm cluster"]
     P3["🔜 Phase 3<br/>Training + Validation"]
     P4["🔜 Phase 4<br/>Active Learning"]
     P5["🔜 Phase 5<br/>Orchestration"]

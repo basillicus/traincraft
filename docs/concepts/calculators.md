@@ -93,7 +93,7 @@ pseudopotentials = { Si = "Si.pbe-n-kjpaw_psl.1.0.0.UPF" }
 properties = ["dipole"]
 ```
 
-Fully open source (conda-forge / the `traincraft-qe` image), so the whole workflow
+Fully open source (the source-built `traincraft-qe` image), so the whole workflow
 can run with no licensed software. QE **can** compute polarizability/dielectric
 response via DFPT (`ph.x` with `epsil`/`fpol`); because QE is a periodic code,
 molecular polarizability is done in a vacuum supercell. That is a second binary
