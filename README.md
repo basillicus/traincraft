@@ -11,6 +11,38 @@ only spends expensive DFT on structures that actually improve the model.
 
 ---
 
+## 📚 Documentation
+
+The `docs/` folder is a **MkDocs (Material)** site — reading the raw `.md` files
+directly misses the navigation, cross-links, and auto-generated API reference, so
+read it as a rendered site instead:
+
+```bash
+pixi install -e docs      # one-time: MkDocs + Material + mkdocstrings
+pixi run docs-serve       # live-reload server → open http://127.0.0.1:8000
+```
+
+To produce static HTML (e.g. to publish or browse offline):
+
+```bash
+pixi run docs-build       # strict build into ./site/  — open site/index.html
+```
+
+Good entry points once the site is up:
+
+- **[Getting started → Full Workflow: From Scratch to HPC](docs/getting-started/end-to-end.md)**
+  — the line-by-line guide from `git clone` to a DFT-labeled dataset on a cluster.
+- **Concepts** — [the pipeline](docs/concepts/index.md), [calculators & DFT
+  labeling](docs/concepts/calculators.md), [geometry](docs/concepts/geometry.md),
+  [provenance](docs/concepts/provenance.md).
+- **How-to → [Run on HPC (Slurm + Apptainer)](docs/how-to/hpc.md)** — containers,
+  the `runtime`/`mpi` knobs, and worked Leonardo (PMIx) and LUMI (Cray) examples.
+
+> The links above point at the source files for convenience; in the served site
+> they appear in the left-hand navigation with full cross-linking and search.
+
+---
+
 ## Quickstart
 
 ### 1 — Install
@@ -244,6 +276,7 @@ dscribe, mdapackmol-fmt) in a single reproducible lockfile.
 | `dev` | `pixi install -e dev` | + pytest, ruff, mypy |
 | `science` | `pixi install -e science` | + hiphive, tblite, geometry tools, dscribe |
 | `mace` | `pixi install -e mace` | + torch, mace-torch |
+| `docs` | `pixi install -e docs` | + mkdocs-material, mkdocstrings (see [Documentation](#-documentation)) |
 
 ---
 
