@@ -1,0 +1,38 @@
+Bootstrap: docker
+From: condaforge/miniforge3:latest
+
+# traincraft-qe — open-source DFT labeling image (Quantum ESPRESSO).
+#
+# The fully open, no-license alternative to the FHI-aims image: Quantum ESPRESSO
+# (pw.x, and ph.x for linear response) installed from conda-forge. Like the
+# FHI-aims image it holds ONLY the DFT engine — no Python, no traincraft. It is
+# invoked as a bare MPI binary by traincraft-core's `qe` calculator, with the run
+# command injected from $TRAINCRAFT_PW_COMMAND (DESIGN §20.3).
+#
+# MPI: conda-forge ships an MPI with QE. For single-node this works out of the
+# box; for multi-node on an HPC use the hybrid model (bind the host MPI/libfabric
+# so QE drives the real interconnect) exactly as for the FHI-aims image.
+
+%post
+    set -eux
+    mamba install -y -n base -c conda-forge qe
+    mamba clean -ay
+
+%environment
+    export PATH=/opt/conda/bin:$PATH
+    # Point QE at your pseudopotentials at runtime (bind the dir in, or set in TOML):
+    #   export ESPRESSO_PSEUDO=/path/to/pseudo   (bound via apptainer --bind)
+
+%runscript
+    exec pw.x "$@"
+
+%labels
+    org.traincraft.image qe
+    org.traincraft.target cpu-mpi
+    org.traincraft.license open-source
+
+%help
+    Quantum ESPRESSO worker (open source). Launched by srun for host-PMI:
+      srun apptainer exec --bind "$SCRATCH",<pseudo-dir> traincraft-qe.sif pw.x
+    Inputs are written, and outputs parsed, by traincraft-core's `qe` calculator
+    (TRAINCRAFT_PW_COMMAND). No license required.

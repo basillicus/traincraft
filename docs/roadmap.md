@@ -83,7 +83,7 @@ Label selected frames with energy, forces, stress, dipole, and polarizability.
 
 Run the real workflow on CINECA Leonardo via **Apptainer**. See
 [`DESIGN.md` §20](https://github.com/your-org/traincraft/blob/main/DESIGN.md) and
-the [`how-to/HPC on Leonardo`](how-to/hpc-leonardo.md) guide.
+the [Run on HPC (Slurm + Apptainer)](how-to/hpc.md) guide.
 
 - ✅ Architecture + three Apptainer `*.def` files (`containers/`): `traincraft-core`
   (CPU orchestrator), `traincraft-mlip` (GPU/Booster MACE), `traincraft-dft`

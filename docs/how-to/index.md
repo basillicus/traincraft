@@ -10,4 +10,4 @@ background explanations.
 | [Write a Custom Sampler](custom-sampler.md) | You want a sampling strategy beyond MD/MC/rattle |
 | [Use Your Own MACE Model](own-mace-model.md) | You have a fine-tuned checkpoint to deploy |
 | [Manage Datasets](datasets.md) | Merging, filtering, and inspecting extxyz datasets |
-| [Run on HPC (Leonardo)](hpc-leonardo.md) | Build/run the Apptainer containers and dispatch Slurm steps |
+| [Run on HPC (Slurm + Apptainer)](hpc.md) | Build the containers and dispatch the pipeline on any Slurm cluster |

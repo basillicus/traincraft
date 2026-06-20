@@ -73,6 +73,9 @@ def test_label_stage_injects_dft_command_and_core_image(tmp_path):
     assert "traincraft-core.sif traincraft stage label" in text
     assert "export TRAINCRAFT_AIMS_COMMAND=" in text
     assert "traincraft-dft.sif aims.x" in text
+    # the open-source QE engine is injected too, pointing at its own image
+    assert "export TRAINCRAFT_PW_COMMAND=" in text
+    assert "traincraft-qe.sif pw.x" in text
     assert "#SBATCH --nodes=2" in text
     assert "#SBATCH --ntasks=224" in text
     assert "#SBATCH --account=ACC_1" in text

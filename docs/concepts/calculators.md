@@ -9,7 +9,15 @@ uses calculators in **two distinct roles**:
 | **Labeling** | `[labeling.calculator]` | The expensive engine that *labels the selected frames* | `fhi_aims`, `qe` |
 
 This separation is the whole point of the spine: explore cheaply, run the
-selection funnel, then spend DFT only on the survivors.
+selection funnel, then spend the expensive engine only on the survivors.
+
+**The labeler is not tied to any one code.** Any calculator that produces
+energies and forces can label frames. Two DFT engines ship today —
+**Quantum ESPRESSO (`qe`), which is fully open source and freely available**, and
+**FHI-aims (`fhi_aims`)**, which is licensed and currently the path for
+polarizability. Adding another QM/MLIP backend is a single registered factory
+(see [Write a Custom Builder](../how-to/custom-builder.md) for the registry
+pattern — calculators work the same way).
 
 ## Available calculators
 
@@ -36,7 +44,7 @@ device = "cuda"          # "cpu" locally; "cuda" on the GPU image
 Both DFT calculators are ASE file-IO calculators. **Their run command is never
 configured in the TOML** — it is injected from the environment so the same config
 works locally and inside a container on HPC (see
-[Run on HPC](../how-to/hpc-leonardo.md)):
+[Run on HPC](../how-to/hpc.md)):
 
 | Env var | Default | Used by |
 |---|---|---|
@@ -45,11 +53,26 @@ works locally and inside a container on HPC (see
 | `TRAINCRAFT_AIMS_SPECIES_DIR` / `AIMS_SPECIES_DIR` | — | `fhi_aims` species defaults |
 | `TRAINCRAFT_PW_PSEUDO_DIR` / `ESPRESSO_PSEUDO` | — | `qe` pseudopotentials |
 
-On Leonardo the Slurm executor sets, e.g.,
-`TRAINCRAFT_AIMS_COMMAND="srun apptainer exec … traincraft-dft.sif aims.x"` for
-you — you never hard-code it.
+On HPC the Slurm executor sets these for you, e.g.
+`TRAINCRAFT_PW_COMMAND="srun apptainer exec … traincraft-qe.sif pw.x"` — you never
+hard-code the command.
 
-### `fhi_aims`
+### `qe` (Quantum ESPRESSO — open source, the default choice)
+```toml
+[labeling.calculator]
+type    = "qe"
+ecutwfc = 60.0
+kpts    = [4, 4, 4]
+pseudopotentials = { Si = "Si.pbe-n-kjpaw_psl.1.0.0.UPF" }
+properties = ["dipole"]
+```
+
+Fully open source and freely available (conda-forge / the `traincraft-qe` image),
+so the whole workflow can run end-to-end with no licensed software. Full DFT
+polarizability in QE needs a separate `ph.x` run, so `qe` does **not** advertise
+`polarizability` yet; use `fhi_aims` if you need it today.
+
+### `fhi_aims` (licensed; the polarizability path)
 ```toml
 [labeling.calculator]
 type             = "fhi_aims"
@@ -64,20 +87,6 @@ properties       = ["dipole", "polarizability"]   # beyond E/F/stress
 **Polarizability via DFPT** (the IR/Raman driver) is selected automatically from
 the requested `properties` and the system's periodicity: `dfpt = dielectric` for
 periodic cells, `dfpt = polarizability` for molecules.
-
-### `qe`
-```toml
-[labeling.calculator]
-type    = "qe"
-ecutwfc = 60.0
-kpts    = [4, 4, 4]
-pseudopotentials = { Si = "Si.pbe-n-kjpaw_psl.1.0.0.UPF" }
-properties = ["dipole"]
-```
-
-Full DFT polarizability in QE needs a separate `ph.x` run, so `qe` does **not**
-advertise `polarizability`; requesting it raises `NotImplementedError`. Use
-`fhi_aims` for polarizability today.
 
 ## The labeling stage
 

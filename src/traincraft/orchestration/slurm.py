@@ -11,8 +11,10 @@ Image map (overridable per stage in ``[orchestration.slurm.stages.*]``):
 
 The ``label`` stage runs ``traincraft`` in the *core* image but injects the DFT
 engine command (``TRAINCRAFT_AIMS_COMMAND`` / ``TRAINCRAFT_PW_COMMAND``) so the
-heavy MPI binary runs in the *dft* image under ``srun`` — keeping the calculator
-plugins container-agnostic (DESIGN §20.3).
+heavy MPI binary runs in its own DFT image under ``srun`` — keeping the calculator
+plugins container-agnostic (DESIGN §20.3). The defaults point FHI-aims at
+``traincraft-dft.sif`` and Quantum ESPRESSO (open source) at ``traincraft-qe.sif``;
+both are overridable via ``[orchestration.slurm].aims_command``/``pw_command``.
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ _DEFAULT_IMAGE = {
 }
 _DEFAULT_GPUS = {"sample": 1}
 _DEFAULT_AIMS_CMD = "srun apptainer exec{binds} {sif_dir}/traincraft-dft.sif aims.x"
-_DEFAULT_PW_CMD = "srun apptainer exec{binds} {sif_dir}/traincraft-dft.sif pw.x"
+_DEFAULT_PW_CMD = "srun apptainer exec{binds} {sif_dir}/traincraft-qe.sif pw.x"
 
 _JOB_ID_RE = re.compile(r"Submitted batch job (\d+)")
 

@@ -124,7 +124,7 @@ nav:
     - Write a Custom Sampler: how-to/custom-sampler.md
     - Use Your Own MACE Model: how-to/own-mace-model.md
     - Manage Datasets: how-to/datasets.md
-    - Run on HPC (Leonardo): how-to/hpc-leonardo.md
+    - Run on HPC (Slurm + Apptainer): how-to/hpc.md
   - Reference:
     - reference/index.md
     - CLI: reference/cli.md

@@ -359,31 +359,38 @@ add-on, not a rewrite. Deferred, but kept feasible by the architecture.
 
 ---
 
-## 20. Deployment: containers & HPC (Leonardo)
+## 20. Deployment: containers & HPC
 
-Production DFT labeling and MLIP training run on **CINECA Leonardo**. The package
-is shipped as **Apptainer** images, deliberately **split into three** rather than
-one monolith. The split is not a workaround — it falls out of the architecture:
-the container boundary is the same boundary as the calculator/sampler plugin seam
-(§2.2), and the three images map onto three different concerns (hardware target,
-rebuild cadence, and licensing).
+DFT labeling and MLIP training run on **any Slurm HPC cluster** (CINECA Leonardo
+is our reference deployment, used as the worked example throughout). The package
+is shipped as **Apptainer** images, deliberately **split** rather than one
+monolith. The split is not a workaround — it falls out of the architecture: the
+container boundary is the same boundary as the calculator/sampler plugin seam
+(§2.2), and the images map onto separate concerns (hardware target, rebuild
+cadence, and licensing).
 
-### 20.1 The three images
+### 20.1 The images
 
 | Image | Target | Contents | Shareable? |
 |-------|--------|----------|------------|
-| `traincraft-core.sif` | CPU (login + DCGP) | `traincraft` + CPU science stack: ASE, pymatgen, RDKit, Packmol, hiphive, tblite/xtb, dscribe, pydantic, Typer. **The orchestrator.** | yes |
-| `traincraft-mlip.sif` | GPU (Booster, A100/CUDA) | `traincraft` + PyTorch + CUDA + MACE (+ training deps). Runs MLIP sampling and training stages. | yes |
-| `traincraft-dft.sif` | CPU (DCGP, Sapphire Rapids) | **FHI-aims** compiled with MPI + MKL + ScaLAPACK, plus `species_defaults`. Invoked as a bare MPI binary. | **no — licensed, private build** |
+| `traincraft-core.sif` | CPU | `traincraft` + CPU science stack: ASE, pymatgen, RDKit, Packmol, hiphive, tblite/xtb, dscribe, pydantic, Typer. **The orchestrator.** | yes |
+| `traincraft-mlip.sif` | GPU (CUDA) | `traincraft` + PyTorch + CUDA + MACE (+ training deps). Runs MLIP sampling and training stages. | yes |
+| `traincraft-qe.sif` | CPU | **Quantum ESPRESSO** (conda-forge, MPI). DFT labeling. Invoked as a bare MPI binary. | yes — **open source** |
+| `traincraft-dft.sif` | CPU | **FHI-aims** compiled with MPI + MKL + ScaLAPACK, plus `species_defaults`. DFT labeling + polarizability. | **no — licensed, private build** |
+
+The labeler is **engine-agnostic**: any calculator producing energies/forces can
+label frames. Two DFT engines ship — `qe` (open source, no license) and
+`fhi_aims` (licensed; the polarizability path). Build only the one you use.
 
 Rationale for splitting:
-1. **Hardware** — MACE wants the GPU Booster; FHI-aims wants the CPU DCGP
-   partition. One image cannot be optimal for both.
+1. **Hardware** — MACE wants a GPU partition; DFT wants CPU nodes. One image
+   cannot be optimal for both.
 2. **Rebuild cadence** — tweaking the TOML parser must not require rebuilding a
-   multi-GB CUDA image, nor recompiling FHI-aims.
-3. **Licensing** — FHI-aims is **not redistributable**. Isolating it in its own
-   image keeps `core` and `mlip` freely shareable, and keeps the licensed source
-   out of every other build context (and out of this repo — see §20.5).
+   multi-GB CUDA image, nor recompiling a DFT engine.
+3. **Licensing** — FHI-aims is **not redistributable**. Isolating it keeps `core`,
+   `mlip`, and `qe` freely shareable, and keeps the licensed source out of every
+   other build context (and out of this repo — see §20.5). QE carries no such
+   restriction.
 
 ### 20.2 Run model — orchestrator dispatches Slurm steps
 
