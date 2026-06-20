@@ -4,16 +4,18 @@ This is the **line-by-line** walkthrough: clone the repo, build a dataset locall
 then run the *same* workflow on **any Slurm HPC cluster** — exploring with MACE on
 a GPU partition and labeling the selected frames with DFT on a CPU partition.
 
-The labeling engine is your choice: **Quantum ESPRESSO (`qe`) is fully open source
-and is used as the default below**; FHI-aims is an alternative (licensed; needed
-for polarizability). Follow it top to bottom; values specific to your cluster
-(account, partitions, paths) are called out explicitly.
+TrainCraft is **code-agnostic**: the labeling engine is your choice. Both
+**FHI-aims** (the reference engine) and **Quantum ESPRESSO** (fully open source)
+ship, and any other QM code (VASP, …) can be added as a plugin. Follow the guide
+top to bottom; values specific to your cluster (account, partitions, paths) are
+called out explicitly.
 
 !!! note "What actually runs"
     Steps 1–5 run today with zero or minimal deps. Steps 6–9 need Apptainer and a
-    Slurm allocation. With QE the whole path is open source; FHI-aims additionally
-    needs your license/source and the `TODO` markers in
-    `containers/traincraft-dft.def` filled in for your cluster's compiler/MPI.
+    Slurm allocation. With QE the whole path uses only open-source tooling;
+    FHI-aims's academic license is free for academic groups (voluntary donation,
+    MS1P e.V.) and you build its image from your own source, filling the `TODO`
+    markers in `containers/traincraft-dft.def` for your cluster's compiler/MPI.
 
 ---
 
@@ -21,8 +23,9 @@ for polarizability). Follow it top to bottom; values specific to your cluster
 
 - `git`, a Linux shell.
 - For the HPC part: an account on a Slurm cluster and `apptainer` available there.
-  Labeling with QE needs nothing extra; FHI-aims needs its **source tarball**
-  (licensed — not shipped with TrainCraft).
+- A DFT engine for labeling: **QE** needs nothing extra; **FHI-aims** needs its
+  **source** (academic license is free with a voluntary donation; obtained by
+  registration, so not shipped with TrainCraft).
 
 ---
 
@@ -128,43 +131,51 @@ commands are identical.
 
 ## 5. Switch labeling to real DFT
 
-Replace the EMT stand-in with a real DFT engine. **Quantum ESPRESSO is open source
-and the default** here:
+Replace the EMT stand-in with a real DFT engine. TrainCraft is code-agnostic —
+**FHI-aims** (the reference engine) and **Quantum ESPRESSO** (open source) both
+ship, and any other code (VASP, …) can be added as a plugin. Pick whichever your
+group uses.
 
-```toml
-[labeling.calculator]
-type    = "qe"
-ecutwfc = 60.0
-kpts    = [4, 4, 4]
-pseudopotentials = { Cu = "Cu.pbe-dn-kjpaw_psl.1.0.0.UPF" }
-```
+=== "FHI-aims (reference)"
 
-The **run command is injected from the environment**, so the same TOML works
-locally and in a container. Locally, with QE installed:
-
-```bash
-export TRAINCRAFT_PW_COMMAND="mpirun -np 8 pw.x"
-export ESPRESSO_PSEUDO=/path/to/pseudo
-pixi run traincraft stage label my_workflow.toml
-```
-
-You never put the command in the TOML — on HPC the executor sets it for you.
-
-??? note "Prefer FHI-aims? (e.g. you need polarizability)"
-    Use `type = "fhi_aims"` instead; it adds `polarizability` via DFPT. It is
-    licensed, so you build its image from your own source (step 6).
     ```toml
     [labeling.calculator]
     type             = "fhi_aims"
     xc               = "pbe"
     species_defaults = "tight"
     kpts             = [4, 4, 4]
-    properties       = ["polarizability"]
+    properties       = ["polarizability"]   # E/F/stress always; + DFPT polarizability
     ```
     ```bash
     export TRAINCRAFT_AIMS_COMMAND="mpirun -np 8 aims.x"
     export AIMS_SPECIES_DIR=/path/to/species_defaults
+    pixi run traincraft stage label my_workflow.toml
     ```
+    The academic license (MS1P e.V.) is free for academic groups with a voluntary
+    donation; you get the source by registration, so you build its image yourself
+    (step 6).
+
+=== "Quantum ESPRESSO (open source)"
+
+    ```toml
+    [labeling.calculator]
+    type    = "qe"
+    ecutwfc = 60.0
+    kpts    = [4, 4, 4]
+    pseudopotentials = { Cu = "Cu.pbe-dn-kjpaw_psl.1.0.0.UPF" }
+    ```
+    ```bash
+    export TRAINCRAFT_PW_COMMAND="mpirun -np 8 pw.x"
+    export ESPRESSO_PSEUDO=/path/to/pseudo
+    pixi run traincraft stage label my_workflow.toml
+    ```
+    No license needed. QE can also do polarizability via DFPT (`ph.x`, periodic;
+    molecules in a vacuum supercell) — that second step isn't wired into the `qe`
+    plugin yet, so use FHI-aims for polarizability today.
+
+The **run command is injected from the environment**, so the same TOML works
+locally and in a container — you never put the command in the TOML; on HPC the
+executor sets it for you.
 
 ---
 

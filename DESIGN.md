@@ -376,7 +376,7 @@ cadence, and licensing).
 | `traincraft-core.sif` | CPU | `traincraft` + CPU science stack: ASE, pymatgen, RDKit, Packmol, hiphive, tblite/xtb, dscribe, pydantic, Typer. **The orchestrator.** | yes |
 | `traincraft-mlip.sif` | GPU (CUDA) | `traincraft` + PyTorch + CUDA + MACE (+ training deps). Runs MLIP sampling and training stages. | yes |
 | `traincraft-qe.sif` | CPU | **Quantum ESPRESSO** (conda-forge, MPI). DFT labeling. Invoked as a bare MPI binary. | yes — **open source** |
-| `traincraft-dft.sif` | CPU | **FHI-aims** compiled with MPI + MKL + ScaLAPACK, plus `species_defaults`. DFT labeling + polarizability. | **no — licensed, private build** |
+| `traincraft-dft.sif` | CPU | **FHI-aims** compiled with MPI + MKL + ScaLAPACK, plus `species_defaults`. DFT labeling + polarizability. | private build (academic license; see §20.5) |
 
 The labeler is **engine-agnostic**: any calculator producing energies/forces can
 label frames. Two DFT engines ship — `qe` (open source, no license) and
@@ -387,10 +387,10 @@ Rationale for splitting:
    cannot be optimal for both.
 2. **Rebuild cadence** — tweaking the TOML parser must not require rebuilding a
    multi-GB CUDA image, nor recompiling a DFT engine.
-3. **Licensing** — FHI-aims is **not redistributable**. Isolating it keeps `core`,
-   `mlip`, and `qe` freely shareable, and keeps the licensed source out of every
-   other build context (and out of this repo — see §20.5). QE carries no such
-   restriction.
+3. **Licensing** — FHI-aims's source is obtained by academic registration and
+   should not be publicly redistributed. Isolating it keeps `core`, `mlip`, and
+   `qe` freely shareable, and keeps that source out of every other build context
+   (and out of this repo — see §20.5). QE carries no such restriction.
 
 ### 20.2 Run model — orchestrator dispatches Slurm steps
 
@@ -435,36 +435,38 @@ A small `executor` config (image path, partition, resources, `mpi: true/false`,
 `.sif` to exec is an orchestration decision; the science layer is untouched —
 consistent with principle #4 (orchestration is the last, swappable layer).
 
-### 20.4 FHI-aims & MPI on Leonardo (the hard part)
+### 20.4 DFT & MPI across nodes (the hard part)
 
 The genuinely delicate piece is **multi-node MPI from inside a container**. A
-bundled MPI alone will not use Leonardo's InfiniBand and will not scale across
-nodes. We use the **hybrid model**:
+bundled MPI alone will not use the host InterConnect and will not scale across
+nodes. Single-node works out of the box; multi-node uses the **hybrid model**:
 
-- FHI-aims is compiled in the image against an MPI that is **ABI-compatible with
-  the host** (Intel MPI / MPICH ABI), with MKL + ScaLAPACK, targeting Sapphire
-  Rapids.
+- The DFT engine is built/installed against an MPI **ABI-compatible with the host**
+  (e.g. Intel MPI / MPICH ABI); for FHI-aims also MKL + ScaLAPACK tuned for the
+  target CPU. (QE from conda-forge needs no such compile-time tuning.)
 - At runtime, `srun` launches ranks (host PMI), and the host's
-  MPI/`libfabric`/UCX are **bind-mounted** so FHI-aims drives the real fabric.
-- DFPT (polarizability, the Raman driver) must be enabled in the FHI-aims build.
+  MPI/`libfabric`/UCX are **bind-mounted** so the engine drives the real fabric.
+- DFPT (polarizability) — FHI-aims computes it in one `aims.x` run; QE supports it
+  via a separate `ph.x` step (periodic), not yet wired into the `qe` plugin.
 
-Exact compiler/MPI/module versions are resolved at build time against the
-Leonardo modules in use; documented in `containers/README.md`.
+Exact compiler/MPI/module versions are resolved at build time against your
+cluster's modules; documented in `containers/README.md`.
 
 ### 20.5 Building & licensing
 
-- **Build location:** Leonardo login nodes typically disallow rooted
-  `apptainer build`. Images are built with `--fakeroot` where permitted, or built
-  off-cluster/in CI and the `.sif` transferred (`scp`/`rsync`) to Leonardo.
-- **Definition files** live in `containers/` (`*.def`). `core.def` and `mlip.def`
-  are public; `dft.def` references FHI-aims source/license that is **never
-  committed** — it is supplied at build time via a build path/arg and documented,
-  not stored, in the repo.
+- **Build location:** some login nodes disallow rooted `apptainer build`. Images
+  are built with `--fakeroot` where permitted, or off-cluster/in CI and the `.sif`
+  transferred (`scp`/`rsync`).
+- **Definition files** live in `containers/` (`*.def`). `core.def`, `mlip.def`,
+  and `qe.def` carry no restrictions. FHI-aims's academic license (MS1P e.V.) is
+  free for academic groups with a **voluntary donation**; the source is obtained
+  by registration and should not be publicly redistributed, so `dft.def` takes it
+  as a build-time arg and it is **never committed** to the repo.
 
 ### 20.6 Image ↔ stage map
 
 ```
-geometry / selection / datasets / orchestration   → core.sif  (CPU)
-sampling (MD/MC) + training (MACE)                 → mlip.sif (GPU, --nv)
-DFT labeling (FHI-aims, E/F/stress/dipole/pol.)    → dft.sif  (CPU, host-MPI)
+geometry / selection / datasets / orchestration   → core.sif            (CPU)
+sampling (MD/MC) + training (MACE)                 → mlip.sif            (GPU, --nv)
+DFT labeling (E/F/stress/dipole/pol.)              → qe.sif | dft.sif    (CPU, host-MPI)
 ```

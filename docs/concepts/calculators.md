@@ -11,13 +11,21 @@ uses calculators in **two distinct roles**:
 This separation is the whole point of the spine: explore cheaply, run the
 selection funnel, then spend the expensive engine only on the survivors.
 
-**The labeler is not tied to any one code.** Any calculator that produces
-energies and forces can label frames. Two DFT engines ship today —
-**Quantum ESPRESSO (`qe`), which is fully open source and freely available**, and
-**FHI-aims (`fhi_aims`)**, which is licensed and currently the path for
-polarizability. Adding another QM/MLIP backend is a single registered factory
-(see [Write a Custom Builder](../how-to/custom-builder.md) for the registry
-pattern — calculators work the same way).
+**TrainCraft is code-agnostic.** Any calculator that produces energies and forces
+can label frames — FHI-aims, Quantum ESPRESSO, VASP, or any other QM code can be
+plugged in as a single registered factory (an ASE-style calculator + a config
+model + a registry entry; see [Write a Custom Builder](../how-to/custom-builder.md)
+for the registry pattern — calculators work the same way). Two DFT engines ship
+today:
+
+- **`fhi_aims`** — the reference engine. Its academic license (from MS1P e.V.) is
+  free for academic groups with a **voluntary donation**; you obtain the source by
+  registration (so its container is built from your own copy — see
+  [Run on HPC](../how-to/hpc.md)).
+- **`qe` (Quantum ESPRESSO)** — fully open source, no license; runs the whole
+  workflow with open tooling only.
+
+Both can compute polarizability via DFPT (see below).
 
 ## Available calculators
 
@@ -57,22 +65,7 @@ On HPC the Slurm executor sets these for you, e.g.
 `TRAINCRAFT_PW_COMMAND="srun apptainer exec … traincraft-qe.sif pw.x"` — you never
 hard-code the command.
 
-### `qe` (Quantum ESPRESSO — open source, the default choice)
-```toml
-[labeling.calculator]
-type    = "qe"
-ecutwfc = 60.0
-kpts    = [4, 4, 4]
-pseudopotentials = { Si = "Si.pbe-n-kjpaw_psl.1.0.0.UPF" }
-properties = ["dipole"]
-```
-
-Fully open source and freely available (conda-forge / the `traincraft-qe` image),
-so the whole workflow can run end-to-end with no licensed software. Full DFT
-polarizability in QE needs a separate `ph.x` run, so `qe` does **not** advertise
-`polarizability` yet; use `fhi_aims` if you need it today.
-
-### `fhi_aims` (licensed; the polarizability path)
+### `fhi_aims` (FHI-aims — the reference engine)
 ```toml
 [labeling.calculator]
 type             = "fhi_aims"
@@ -84,9 +77,28 @@ properties       = ["dipole", "polarizability"]   # beyond E/F/stress
 # extra = { ... }                   # any control.in keyword, passed through verbatim
 ```
 
-**Polarizability via DFPT** (the IR/Raman driver) is selected automatically from
-the requested `properties` and the system's periodicity: `dfpt = dielectric` for
-periodic cells, `dfpt = polarizability` for molecules.
+**Polarizability via DFPT** (the IR/Raman driver) is computed in a single
+`aims.x` run and selected automatically from the requested `properties` and the
+system's periodicity: `dfpt = dielectric` for periodic cells, `dfpt =
+polarizability` for molecules.
+
+### `qe` (Quantum ESPRESSO — open source)
+```toml
+[labeling.calculator]
+type    = "qe"
+ecutwfc = 60.0
+kpts    = [4, 4, 4]
+pseudopotentials = { Si = "Si.pbe-n-kjpaw_psl.1.0.0.UPF" }
+properties = ["dipole"]
+```
+
+Fully open source (conda-forge / the `traincraft-qe` image), so the whole workflow
+can run with no licensed software. QE **can** compute polarizability/dielectric
+response via DFPT (`ph.x` with `epsil`/`fpol`); because QE is a periodic code,
+molecular polarizability is done in a vacuum supercell. That is a second binary
+(`ph.x`) after the SCF, which TrainCraft's `qe` plugin does **not wire yet** — so
+for polarizability today use `fhi_aims`, or extend `build_qe` with a `ph.x` step
+(a tracked extension point, not a QE limitation).
 
 ## The labeling stage
 

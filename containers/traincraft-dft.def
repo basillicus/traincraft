@@ -1,13 +1,15 @@
 Bootstrap: docker
 From: intel/oneapi-hpckit:2024.2.1-devel-ubuntu22.04
 
-# traincraft-dft — FHI-aims labeling image for Leonardo DCGP (Sapphire Rapids).
+# traincraft-dft — FHI-aims DFT labeling image (the reference engine).
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
-# │ PRIVATE / LICENSED. FHI-aims is NOT redistributable. Its source is NOT    │
-# │ committed to this repo — supply it at build time via --build-arg          │
-# │ AIMS_SRC=/path/to/fhi-aims.tar.gz. Never push this .sif to a public       │
-# │ registry.                                                                 │
+# │ FHI-aims academic license (MS1P e.V.) is free for academic groups with a │
+# │ voluntary donation; the source is obtained by registration. It is NOT     │
+# │ committed to this repo and should not be publicly redistributed — supply  │
+# │ it at build time via --build-arg AIMS_SRC=/path/to/fhi-aims.tar.gz, and   │
+# │ keep the resulting .sif off public registries.                           │
+# │ (Prefer fully open source? Use traincraft-qe.def — Quantum ESPRESSO.)     │
 # └─────────────────────────────────────────────────────────────────────────┘
 #
 # Contents: only FHI-aims (aims.x) compiled with Intel MPI + MKL + ScaLAPACK,
@@ -16,7 +18,7 @@ From: intel/oneapi-hpckit:2024.2.1-devel-ubuntu22.04
 # aims.out around `srun apptainer exec traincraft-dft.sif aims.x`.
 #
 # MPI: hybrid model. Built against Intel MPI (MPICH ABI) so that at runtime the
-# host MPI / libfabric / UCX (bind-mounted) drive Leonardo's InfiniBand. A
+# host MPI / libfabric / UCX (bind-mounted) drive the host interconnect. A
 # bundled MPI alone will NOT scale across nodes.
 
 %arguments
