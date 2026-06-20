@@ -110,8 +110,10 @@ Acceptance (met)
 
 ## Phase 2 — DFT labeling with full property set  *(mostly done)*
 
-**Goal:** label E/F/stress + dipole + polarizability. **Production target is
-FHI-aims on CINECA Leonardo** (see "Packaging & HPC deployment" below).
+**Goal:** label E/F/stress + dipole + polarizability with **any QM code** that
+yields energies and forces (FHI-aims = the reference/primary engine; QE = the
+open-source option; VASP/others = a plugin each). Production runs on **any Slurm
+cluster** (see "Packaging & HPC deployment" below).
 
 Deliverables
 - ✅ `calculators/dft.py` — QE and FHI-AIMS factories; SCF for E/F/stress; dipole
@@ -133,34 +135,42 @@ Acceptance
 
 ---
 
-## Cross-cutting — Packaging & HPC deployment (Leonardo)
+## Cross-cutting — Packaging & HPC deployment (any Slurm cluster)
 
-**Goal:** run the real workflow on CINECA Leonardo via Apptainer. Gates Phase 2
-(DFT labeling) and Phase 3 (MACE training at scale). Full architecture in
-[`DESIGN.md` §20](DESIGN.md).
+**Goal:** run the real workflow on **any Slurm cluster** via Apptainer (or the
+cluster's own binaries). Gates Phase 2 (DFT labeling) and Phase 3 (MACE training
+at scale). Nothing is site-specific in the code — account/partitions/modules/binds
+and the `runtime`/`mpi` knobs are all config. Full architecture in
+[`DESIGN.md` §20](DESIGN.md); Leonardo and LUMI appear only as worked examples.
 
-Three images, dispatched as Slurm steps by the `core` orchestrator:
+Four images, dispatched as Slurm steps by the `core` orchestrator:
 - `traincraft-core.sif` (CPU) — package + geometry/selection/datasets/orchestration.
-- `traincraft-mlip.sif` (GPU/Booster) — PyTorch + CUDA + MACE; sampling + training.
-- `traincraft-dft.sif` (CPU/DCGP) — **FHI-aims** (MPI/MKL/ScaLAPACK); private build.
+- `traincraft-mlip.sif` (GPU) — PyTorch + CUDA + MACE; sampling + training.
+- `traincraft-qe.sif` (CPU) — **Quantum ESPRESSO** (open source); source-built.
+- `traincraft-dft.sif` (CPU) — **FHI-aims** (MPI/MKL/ScaLAPACK); private build.
 
 Deliverables
-- ✅ `containers/` — three Apptainer `*.def` files + README (build via fakeroot /
-  off-cluster, then transfer the `.sif`; FHI-aims license/source kept out of the repo).
+- ✅ `containers/` — four Apptainer `*.def` files + README. DFT images are
+  **compiled from source** (UCX+PMIx+OpenMPI, self-contained); build via fakeroot /
+  off-cluster, then transfer the `.sif`; FHI-aims license/source kept out of the repo.
 - ✅ Resumable per-stage execution (`orchestration/stages.py` + `traincraft stage`)
-  and a **Slurm/Apptainer executor** (`orchestration/slurm.py` + `[orchestration]`):
-  renders dependency-chained sbatch scripts that `apptainer exec` the right image
-  per stage (`sample`→mlip `--nv`; `label`→core + injected `srun … dft.sif aims.x`).
-  `traincraft submit CONFIG [--dry-run]`; `examples/19`.
+  and a **portable Slurm executor** (`orchestration/slurm.py` + `[orchestration]`):
+  renders dependency-chained sbatch scripts with two cluster-agnostic knobs —
+  `runtime` (`apptainer` images | `native` host binaries) and `mpi`
+  (`pmix`|`cray_shasta`|`pmi2`|`none`). `label` injects `srun --mpi=<plugin> …
+  aims.x`/`pw.x`. `traincraft submit CONFIG [--dry-run]`; `examples/19` (Leonardo,
+  apptainer+pmix), `examples/20` (LUMI, native+cray_shasta).
 - ✅ Command-injection plumbing so `dft.py`/`mace` are container-agnostic.
-- 🔜 FHI-aims hybrid-MPI binding (host MPI/libfabric/UCX) verified multi-node on
-  Leonardo (needs the real cluster; `TODO(leonardo)` markers in `dft.def`).
+- 🔜 DFT multi-node verified on a real cluster (PMIx launch + UCX transport on an
+  IB cluster; `native`+cray-mpich on Cray). `TODO(site)` markers in the `.def`s for
+  target-arch and the MKL link line.
 
 Acceptance
 - ✅ `submit --dry-run` renders the full chained pipeline (geometry→…→dataset) with
-  correct images/resources/command-injection (covered by `test_slurm_executor`).
-- 🔜 End-to-end on Leonardo: GPU sampling (`mlip.sif`) + multi-node FHI-aims label
-  (`dft.sif`); results land in the dataset, identical in shape to a local run.
+  correct images/resources/runtime/mpi/command-injection (covered by
+  `test_slurm_executor`, incl. both an IB-PMIx and a Cray-native cluster).
+- 🔜 End-to-end on a real cluster: GPU sampling (`mlip.sif`) + multi-node DFT label;
+  results land in the dataset, identical in shape to a local run.
 
 ---
 
