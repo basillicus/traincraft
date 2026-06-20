@@ -16,6 +16,7 @@ from ..config import TrainCraftConfig
 from ..core import Workspace
 from ..datasets import Dataset, write_frames
 from ..geometry import build_geometry
+from ..labeling import label_frames
 from ..sampling import run_sampling
 from ..selection import run_funnel
 
@@ -50,11 +51,20 @@ def run_pipeline(config: TrainCraftConfig) -> dict:
         selected = run_funnel(candidates, config.selection)
         write_frames(ws.subdir("selected") / "selected.extxyz", selected)
 
+    # --- labeling (DFT on the selected frames) ----------------------------
+    labeled = selected
+    if config.labeling is not None:
+        job = ws.job("labeled_dft")
+        labeled = label_frames(selected, config.labeling.calculator, out_dir=job.dir)
+        write_frames(job.path("labeled.extxyz"), labeled)
+        job.mark_done()
+        logger.info("labeled %d frames -> %s", len(labeled), job.dir)
+
     # --- dataset ----------------------------------------------------------
     dataset_path = None
     if config.dataset is not None:
         ds = Dataset(ws.root / config.dataset.path)
-        ds.append(selected)
+        ds.append(labeled)
         dataset_path = str(ds.write())
         logger.info("dataset written: %s (%d frames)", ds.path, len(ds))
 
@@ -62,6 +72,7 @@ def run_pipeline(config: TrainCraftConfig) -> dict:
         "workspace": str(ws.root),
         "n_candidates": len(candidates),
         "n_selected": len(selected),
+        "n_labeled": len(labeled) if config.labeling is not None else 0,
         "dataset": dataset_path,
     }
     return summary

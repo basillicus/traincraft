@@ -1,0 +1,42 @@
+[run]
+name = "label_after_select"
+seed = 9
+outdir = "runs"
+# Full spine: build → sample (cheap) → select (funnel) → LABEL the survivors.
+# Demonstrates the DFT labeling stage and the labeled_dft/ output tree.
+# Here EMT stands in for DFT so it runs with zero extra deps; on a real run the
+# [labeling.calculator] is `fhi_aims` or `qe` (see docs: Calculators).
+# Run with:  pixi run example-18
+
+[geometry]
+
+[geometry.builder]
+type = "crystal"
+name = "Cu"
+crystalstructure = "fcc"
+a = 3.61
+cubic = true
+supercell = [2, 2, 2]
+
+# cheap exploration engine
+[calculator]
+type = "emt"
+
+[sampling]
+type = "md"
+temperature = 600.0
+steps = 200
+interval = 20
+timestep = 2.0
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 5
+min_distance = 0.7
+
+# expensive labeller, run only on the 5 selected frames
+[labeling.calculator]
+type = "emt"            # real runs: type = "fhi_aims" (xc, species_defaults, ...)
+
+[dataset]
+path = "dataset"

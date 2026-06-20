@@ -40,7 +40,7 @@ def validate(config: Path = typer.Argument(..., exists=True, readable=True)) -> 
     cfg = load_config(config)
     stages = [
         name
-        for name in ("geometry", "calculator", "sampling", "selection", "dataset")
+        for name in ("geometry", "calculator", "sampling", "selection", "labeling", "dataset")
         if getattr(cfg, name) is not None
     ]
     typer.echo("OK: config is valid")

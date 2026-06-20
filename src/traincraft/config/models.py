@@ -505,6 +505,18 @@ class SelectionConfig(TCModel):
     min_distance: float = 0.7  # physicality: min interatomic distance (Angstrom)
 
 
+# -------------------------------------------------------------------------- labeling
+class LabelingConfig(TCModel):
+    """DFT labeling of the *selected* frames (distinct from the sampling calc).
+
+    Use a DFT calculator (`fhi_aims`/`qe`) here to label the funnel's output with
+    energy/forces/stress (+ dipole/polarizability); the cheap `[calculator]` used
+    for sampling is configured separately.
+    """
+
+    calculator: CalculatorConfig
+
+
 # --------------------------------------------------------------------------- dataset
 class DatasetConfig(TCModel):
     path: str = "dataset"
@@ -518,4 +530,5 @@ class TrainCraftConfig(TCModel):
     calculator: CalculatorConfig | None = None
     sampling: SamplingConfig | None = None
     selection: SelectionConfig | None = None
+    labeling: LabelingConfig | None = None
     dataset: DatasetConfig | None = None

@@ -21,6 +21,7 @@ from .core import (
 )
 from .datasets import Dataset, read_frames, write_frames
 from .geometry import build_geometry
+from .labeling import label_frames
 from .orchestration import run_pipeline
 from .sampling import run_sampling
 from .selection import run_funnel
@@ -37,6 +38,7 @@ __all__ = [
     "available",
     "build_geometry",
     "get",
+    "label_frames",
     "load_config",
     "loads_config",
     "make_calculator",
