@@ -53,6 +53,9 @@ testing/
 .pylintrc
 NOTEs
 
+# Claude Code local tooling/config
+.claude/
+
 # TrainCraft run outputs
 runs/
 
