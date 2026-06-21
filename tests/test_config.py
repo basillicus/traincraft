@@ -140,3 +140,25 @@ def test_builder_file_resolved_relative_to_config(tmp_path):
     cfg = load_config(config_file)
     assert Path(cfg.geometry.builder.file).is_absolute()
     assert Path(cfg.geometry.builder.file) == asset
+
+
+def test_tilde_in_outdir_is_expanded():
+    cfg = loads_config('[run]\noutdir = "~/tests/traincraft/runs"\n')
+    assert cfg.run.outdir == str(Path.home() / "tests/traincraft/runs")
+    assert Path(cfg.run.outdir).is_absolute()
+
+
+def test_env_var_in_path_is_expanded(monkeypatch):
+    monkeypatch.setenv("TC_SCRATCH", "/scratch/me")
+    cfg = loads_config(
+        '[geometry.source]\ntype = "file"\npath = "$TC_SCRATCH/in.xyz"\n'
+    )
+    assert cfg.geometry.source.path == "/scratch/me/in.xyz"
+
+
+def test_tilde_path_not_nested_under_config_dir(tmp_path):
+    config_file = tmp_path / "run.toml"
+    config_file.write_text('[dataset]\npath = "~/data/ds"\n')
+    cfg = load_config(config_file)
+    # ~ must expand to home, not be joined onto the config file's directory.
+    assert cfg.dataset.path == str(Path.home() / "data/ds")

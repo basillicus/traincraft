@@ -7,9 +7,24 @@ here plus a registry entry. ``extra="forbid"`` makes typos fail fast.
 
 from __future__ import annotations
 
+import os
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+
+
+def _expand_path(value: str) -> str:
+    """Expand a leading ``~`` and any ``$VAR`` references in a user-given path.
+
+    Applied to every filesystem path in the config so that, e.g.,
+    ``outdir = "~/tests/runs"`` lands in the home directory instead of being
+    taken literally and nested under the working directory.
+    """
+    return os.path.expandvars(os.path.expanduser(value))
+
+
+# A string that is a filesystem path: ``~`` and ``$VAR`` are expanded on parse.
+FsPath = Annotated[str, AfterValidator(_expand_path)]
 
 
 class TCModel(BaseModel):
@@ -19,14 +34,14 @@ class TCModel(BaseModel):
 # --------------------------------------------------------------------------- run
 class RunConfig(TCModel):
     name: str = "traincraft_run"
-    outdir: str = "runs"
+    outdir: FsPath = "runs"
     seed: int | None = 42
 
 
 # ------------------------------------------------------------------------ sources
 class FileSource(TCModel):
     type: Literal["file"] = "file"
-    path: str  # any ASE-readable format
+    path: FsPath  # any ASE-readable format
 
 
 class ScratchSource(TCModel):
@@ -186,7 +201,7 @@ class SurfaceAdsorbateBuilder(TCModel):
     # adsorbate: exactly one of molecule_name | smiles | file
     molecule_name: str | None = None  # ase.build.molecule g2 name
     smiles: str | None = None
-    file: str | None = None  # path resolved relative to config file
+    file: FsPath | None = None  # path resolved relative to config file
     # placement
     site: Literal["ontop", "bridge", "hollow", "fcc", "hcp"] = "ontop"
     height: float = 2.0
@@ -211,7 +226,7 @@ class SurfacePackingBuilder(TCModel):
     # adsorbate molecules to pack above the slab: exactly one
     molecule_name: str | None = None
     smiles: str | None = None
-    file: str | None = None
+    file: FsPath | None = None
     # packing parameters
     n_molecules: int = 4
     tolerance: float = 2.0
@@ -246,7 +261,7 @@ class LiquidSpecies(TCModel):
     # exactly one of molecule_name | smiles | file identifies the species
     molecule_name: str | None = None
     smiles: str | None = None
-    file: str | None = None
+    file: FsPath | None = None
     count: int = 1
 
     @model_validator(mode="after")
@@ -393,7 +408,7 @@ class XtbCalc(TCModel):
 class MaceCalc(TCModel):
     type: Literal["mace"] = "mace"
     model: str = "mace-mp0"  # mace-mp0 | mace-off23
-    model_path: str | None = None  # local fine-tuned model
+    model_path: FsPath | None = None  # local fine-tuned model
     device: str = "cpu"
     default_dtype: str = "float32"
 
@@ -519,7 +534,7 @@ class LabelingConfig(TCModel):
 
 # --------------------------------------------------------------------------- dataset
 class DatasetConfig(TCModel):
-    path: str = "dataset"
+    path: FsPath = "dataset"
     format: Literal["extxyz"] = "extxyz"
 
 
@@ -572,7 +587,7 @@ class MaceTrainer(TCModel):
     # Replay (pretraining) data for multihead fine-tuning. "mp" downloads the
     # Materials Project subset; a path uses your own. Required by MACE for
     # multihead fine-tuning of a non-MP foundation.
-    pt_train_file: str | None = None
+    pt_train_file: FsPath | None = None  # "mp" or a path (~/$VARS expanded)
     num_samples_pt: int = 30000  # paper/MACE-recommended replay sample count
     weight_pt: float = 1.0  # replay-head weight (paper: λ_E^replay = 1)
     weight_ft: float = 1.0  # fine-tune-head weight
@@ -648,7 +663,7 @@ class SlurmStage(TCModel):
 
 class SlurmConfig(TCModel):
     account: str | None = None
-    sif_dir: str = "."  # directory holding the .sif images
+    sif_dir: FsPath = "."  # directory holding the .sif images
     modules: list[str] = Field(default_factory=list)  # `module load` names
     binds: list[str] = Field(default_factory=list)  # apptainer --bind paths
     # How to reach the binaries: our Apptainer images, or binaries already on the

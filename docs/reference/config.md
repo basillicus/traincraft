@@ -3,6 +3,24 @@
 Complete reference for every field in a TrainCraft TOML config file.
 All fields are validated by pydantic v2. Unknown fields raise a `ValidationError`.
 
+## Paths
+
+Every filesystem path in the config (`outdir`, `dataset.path`, source/builder
+`path`/`file`, `model_path`, `pt_train_file`, `slurm.sif_dir`, …) supports:
+
+- **`~` expansion** — a leading `~` resolves to your home directory, so
+  `outdir = "~/tests/runs"` lands in `$HOME/tests/runs`, not a literal `~`
+  folder under the working directory.
+- **Environment variables** — `$VAR` / `${VAR}` are expanded, e.g.
+  `path = "$SCRATCH/in.xyz"`.
+
+Relative *input* paths (e.g. `[geometry.source] path`) are resolved against the
+config file's directory; relative *output* paths (`outdir`, `dataset.path`) are
+left relative to the working directory. Expansion happens before this, so an
+expanded `~`/`$VAR` path is absolute and is used as-is. Expansion uses the home
+and environment of wherever the config is *parsed* — on a different machine,
+prefer absolute paths or environment variables that exist there.
+
 ---
 
 ## `[run]`
@@ -12,7 +30,7 @@ Global settings for the pipeline run.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | `str` | `"traincraft_run"` | Name of the run; becomes the workspace subdirectory |
-| `outdir` | `str` | `"runs"` | Root output directory (relative to working dir) |
+| `outdir` | `str` | `"runs"` | Root output directory (relative to working dir; `~`/`$VAR` expanded — see [Paths](#paths)) |
 | `seed` | `int \| null` | `42` | RNG seed for reproducibility. `null` → random |
 
 ```toml
