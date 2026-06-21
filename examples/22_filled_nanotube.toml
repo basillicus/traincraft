@@ -15,7 +15,10 @@ m             = 10
 length        = 6           # unit cells along the tube axis
 molecule_name = "H2O"
 n_molecules   = 6
-radial_margin = 1.8         # Å gap from the tube wall
+# wall clearance is sized automatically from van der Waals radii; radial_margin
+# is *extra* gap beyond that (0.0 = vdW contact). Tube carbons are also fed to
+# Packmol as a fixed obstacle, so guests can never overlap the wall.
+radial_margin = 0.5
 pbc           = true        # periodic along the tube axis
 
 [calculator]

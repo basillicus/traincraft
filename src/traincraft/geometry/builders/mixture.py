@@ -25,9 +25,32 @@ from pathlib import Path
 
 import numpy as np
 from ase import Atoms
+from ase.data import atomic_numbers, covalent_radii, vdw_radii
 from ase.io import read, write
 
 from ._adsorbate import _canonical_smiles, _resolve_adsorbate
+
+
+def vdw_radius(symbol: str) -> float:
+    """Van der Waals radius (Å) for an element, with a covalent-based fallback.
+
+    ``ase.data.vdw_radii`` has NaN for many elements; there we estimate from the
+    covalent radius. Used to size packing regions by real atomic extent rather
+    than a guessed margin.
+    """
+    z = atomic_numbers[symbol]
+    r = vdw_radii[z]
+    if np.isnan(r):
+        return float(covalent_radii[z]) + 0.8
+    return float(r)
+
+
+def max_vdw_radius(resolved: list[tuple]) -> float:
+    """Largest van der Waals radius among all atoms in a resolved mixture."""
+    symbols = set()
+    for atoms, _, _, _ in resolved:
+        symbols.update(atoms.get_chemical_symbols())
+    return max(vdw_radius(s) for s in symbols)
 
 
 def apportion(weights: list[float], total: int) -> list[int]:
@@ -78,13 +101,18 @@ def resolve_mixture(species: list, total: int | None = None) -> list[tuple]:
 
 
 def run_packmol(items: list[tuple[Atoms, int]], region_line: str, tol: float, seed: int,
-                *, need: str = "this builder") -> Atoms:
+                *, need: str = "this builder", fixed: Atoms | None = None) -> Atoms:
     """Pack ``items`` (atoms, count) into a single Packmol ``region_line``.
 
     ``region_line`` is a full Packmol constraint such as
     ``"inside box 0 0 0 12 12 12"`` or ``"inside cylinder ..."``. All species
     share the one region; Packmol returns them in listed order (every copy of
     species 0, then species 1, …), which :func:`tag_mixture` relies on.
+
+    If ``fixed`` is given (e.g. a nanotube wall or a slab), it is written first
+    as a Packmol *fixed structure* — kept at its exact coordinates and treated as
+    an obstacle, so every packed atom is at least ``tol`` from it. The returned
+    Atoms then begins with the fixed structure, followed by the packed species.
     """
     if shutil.which("packmol") is None:
         raise ImportError(f"{need} needs Packmol. Install it with: pixi install -e science")
@@ -92,6 +120,16 @@ def run_packmol(items: list[tuple[Atoms, int]], region_line: str, tol: float, se
         tmp = Path(tmp)
         out_file = tmp / "packed.xyz"
         blocks = [f"tolerance {tol}", f"seed {seed}", f"output {out_file}", "filetype xyz", ""]
+        if fixed is not None:
+            fixed_file = tmp / "fixed.xyz"
+            write(str(fixed_file), fixed, format="xyz")
+            blocks += [
+                f"structure {fixed_file}",
+                "  number 1",
+                "  fixed 0. 0. 0. 0. 0. 0.",
+                "end structure",
+                "",
+            ]
         for i, (atoms, n) in enumerate(items):
             sp_file = tmp / f"species_{i}.xyz"
             write(str(sp_file), atoms, format="xyz")

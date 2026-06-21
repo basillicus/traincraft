@@ -21,7 +21,7 @@ from ase.build import nanotube
 
 from ...config.models import Species
 from ...core import FRAMEWORK, Provenance, Structure, register, set_fragments
-from .mixture import resolve_mixture, run_packmol, tag_mixture
+from .mixture import max_vdw_radius, resolve_mixture, run_packmol, tag_mixture, vdw_radius
 
 
 def _tube_axis_and_radius(cnt: Atoms) -> tuple[float, float, float]:
@@ -53,16 +53,24 @@ def build_filled_nanotube(cfg) -> Structure:
 
     cx, cy, radius = _tube_axis_and_radius(cnt)
     length_z = float(cnt.get_cell()[2][2])
-    pack_radius = radius - cfg.radial_margin
+
+    resolved = resolve_mixture(_guest_species(cfg), cfg.n_molecules)
+
+    # Size the packing cylinder by *van der Waals* extent, not a guessed margin:
+    # a guest atom centre must clear the carbon wall by (r_vdW(C) + r_vdW(guest)),
+    # so it never overlaps the tube. `radial_margin` adds extra clearance on top.
+    wall_clearance = vdw_radius("C") + max_vdw_radius(resolved)
+    pack_radius = radius - wall_clearance - cfg.radial_margin
     pack_length = length_z - 2 * cfg.axial_margin
     if pack_radius <= 0 or pack_length <= 0:
         raise ValueError(
-            f"tube too small to fill: usable radius {pack_radius:.2f} Å, length "
-            f"{pack_length:.2f} Å. Widen the tube (n/m) or lengthen it (length), "
-            "or reduce radial_margin/axial_margin."
+            f"tube too small to fill without overlap: usable radius "
+            f"{pack_radius:.2f} Å (tube {radius:.2f} − vdW wall clearance "
+            f"{wall_clearance:.2f} − radial_margin {cfg.radial_margin:.2f}), "
+            f"length {pack_length:.2f} Å. Widen the tube (n/m), lengthen it "
+            "(length), use smaller guests, or reduce radial_margin/axial_margin."
         )
 
-    resolved = resolve_mixture(_guest_species(cfg), cfg.n_molecules)
     seed = cfg.seed if cfg.seed is not None else 12345
     # inside cylinder a1 a2 a3 d1 d2 d3 r l — base centre, axis direction, radius, length
     region = (
@@ -70,10 +78,12 @@ def build_filled_nanotube(cfg) -> Structure:
         f"{pack_radius:.4f} {pack_length:.4f}"
     )
     items = [(atoms, n) for atoms, n, _, _ in resolved]
-    guests = run_packmol(items, region, cfg.tolerance, seed, need="filled_nanotube")
-
-    # Combine: tube first (framework), then the packed guests (one fragment each).
-    system = cnt + guests
+    # Pass the tube as a fixed obstacle so Packmol keeps every guest atom at least
+    # `tolerance` from the wall (belt-and-braces with the vdW-sized cylinder). The
+    # output then starts with the tube, followed by the packed guests.
+    system = run_packmol(
+        items, region, cfg.tolerance, seed, need="filled_nanotube", fixed=cnt
+    )
     system.set_cell(cnt.get_cell())
     system.set_pbc((False, False, cfg.pbc))
 

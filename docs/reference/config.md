@@ -162,16 +162,21 @@ Packmol binary (`pixi install -e science`).
 | `file` | `str \| null` | `null` | Single guest: path to a structure file |
 | `species` | `list[Species]` | `[]` | A *mixture* of guests (alternative to the single-guest fields) |
 | `n_molecules` | `int` | `4` | Single mode: copies; ratio mixture: total guests |
-| `radial_margin` | `float` | `1.8` | Gap between guests and the tube wall (Å) |
+| `radial_margin` | `float` | `0.0` | *Extra* wall gap beyond van der Waals contact (Å) |
 | `axial_margin` | `float` | `1.5` | Inset at each tube end (Å; avoids PBC clashes) |
 | `tolerance` | `float` | `2.0` | Packmol minimum separation (Å) |
 | `pbc` | `bool` | `true` | Periodic along the tube axis |
 | `seed` | `int \| null` | `null` | Packmol seed |
 
 Use **either** a single guest (`molecule_name`/`smiles`/`file`) **or** a
-`species` mixture — not both. The builder raises if the tube is too
-narrow/short to hold the requested guests — widen (`n`/`m`), lengthen
-(`length`), or reduce the margins.
+`species` mixture — not both.
+
+**No wall overlap.** The packing cylinder is sized from van der Waals radii so a
+guest atom can never sit inside the carbon wall, and the tube is additionally
+handed to Packmol as a *fixed obstacle* (so every guest atom is also kept at
+least `tolerance` from the wall). If the tube is too narrow/short to hold the
+guests without overlap the builder raises a clear error — widen (`n`/`m`),
+lengthen (`length`), use smaller guests, or reduce the margins.
 
 ### `type = "molecule"`
 

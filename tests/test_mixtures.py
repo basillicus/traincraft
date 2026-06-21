@@ -88,6 +88,24 @@ def test_ratio_liquid_needs_n_molecules():
         LiquidBuilder(species=[Species(molecule_name="H2O", ratio=1.0)], box=(10, 10, 10))
 
 
+# --- SMILES resolver hardening ---------------------------------------------
+
+def test_smiles_water_keeps_hydrogens():
+    pytest.importorskip("rdkit")
+    from traincraft.geometry.builders._adsorbate import _resolve_adsorbate
+
+    w = _resolve_adsorbate(None, "O", None)
+    assert sorted(w.get_chemical_symbols()) == ["H", "H", "O"]  # not O-only
+
+
+def test_smiles_unparseable_raises():
+    pytest.importorskip("rdkit")
+    from traincraft.geometry.builders._adsorbate import _resolve_adsorbate
+
+    with pytest.raises(ValueError, match="could not parse SMILES"):
+        _resolve_adsorbate(None, "not_a_smiles!!", None)
+
+
 # --- solid solution (alloy), no Packmol ------------------------------------
 
 def test_apply_solid_solution_counts_and_seed():

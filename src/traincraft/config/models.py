@@ -242,8 +242,10 @@ class FilledNanotubeBuilder(TCModel):
     file: FsPath | None = None
     species: list[Species] = Field(default_factory=list)
     n_molecules: int = 4  # single mode: copies; ratio mixture: total guests
-    # packing geometry
-    radial_margin: float = 1.8  # Å gap between guests and the tube wall (≈ vdW)
+    # packing geometry. The wall gap is sized automatically from van der Waals
+    # radii (guest atoms can't overlap the carbon wall); radial_margin is *extra*
+    # clearance on top of that, so 0.0 means "vdW contact".
+    radial_margin: float = 0.0  # Å extra gap beyond vdW wall contact
     axial_margin: float = 1.5  # Å inset at each tube end (avoids PBC clashes along z)
     tolerance: float = 2.0  # Packmol min separation
     pbc: bool = True  # periodic along the tube axis

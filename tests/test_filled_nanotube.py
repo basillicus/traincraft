@@ -71,3 +71,35 @@ def test_tube_too_small_raises():
                 )
             )
         )
+
+
+def test_narrow_tube_refused_by_vdw_before_packmol():
+    # An (8,0) tube physically cannot hold water without overlapping the wall;
+    # the vdW sizing rejects it up front (no Packmol needed) with a clear message.
+    with pytest.raises(ValueError, match="too small to fill without overlap"):
+        build_geometry(
+            GeometryConfig(
+                builder=FilledNanotubeBuilder(
+                    n=8, m=0, length=5, molecule_name="H2O", n_molecules=5
+                )
+            )
+        )
+
+
+@pytest.mark.skipif(not _HAS_PACKMOL, reason="packmol binary not installed")
+def test_guests_do_not_overlap_wall():
+    s = build_geometry(
+        GeometryConfig(
+            builder=FilledNanotubeBuilder(
+                n=12, m=12, length=6, molecule_name="H2O", n_molecules=6,
+                tolerance=2.5, seed=1,
+            )
+        )
+    )
+    atoms = s.atoms
+    frag = atoms.arrays["tc_fragment"]
+    wall = atoms.get_positions()[frag == FRAMEWORK]
+    guest = atoms.get_positions()[frag >= 0]
+    dmin = np.sqrt(((guest[:, None, :] - wall[None, :, :]) ** 2).sum(-1)).min()
+    # Packmol's fixed-obstacle constraint keeps every guest atom >= tolerance away.
+    assert dmin >= 2.5 - 1e-3
