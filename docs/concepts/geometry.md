@@ -94,19 +94,66 @@ name = "caffeine"          # or: cid = 2519 / smiles = "..."
 | Builder | System | Key parameters |
 |---|---|---|
 | `nanotube` | Carbon nanotube (empty) | `n`, `m`, `length`, `bond` |
-| `filled_nanotube` | CNT filled with molecules ("fillMyTubes") | `n`, `m`, `length`, `molecule_name`/`smiles`/`file`, `n_molecules`, Packmol |
+| `filled_nanotube` | CNT filled with molecules ("fillMyTubes") | `n`, `m`, `length`, single molecule **or** `species` mixture, `n_molecules`, Packmol |
 | `molecule` | ASE g2 molecule | `name` or `smiles` |
-| `crystal` | Bulk crystal | `name`, `crystalstructure`, `a`, `supercell`, `defects` |
-| `slab` | Crystalline slab | `element`, `facet` or `miller`, `size`, `layers` |
+| `crystal` | Bulk crystal (optionally a mixed solid) | `name`, `crystalstructure`, `a`, `supercell`, `defects`, `composition` |
+| `slab` | Crystalline slab (optionally a mixed solid) | `element`, `facet` or `miller`, `size`, `layers`, `composition` |
 | `layered` | 2D material stack | `material`, `n_layers`, `stacking`, `twist` |
-| `surface_adsorbate` | Molecule on slab | `element`, `facet`, `molecule_name`/`smiles`/`file` |
-| `surface_packing` | N molecules on slab | same + `n_molecules`, Packmol |
+| `surface_adsorbate` | Molecule on slab | `element`, `facet`, `molecule_name`/`smiles`/`file`, `composition` |
+| `surface_packing` | Molecule(s) on slab | same + single molecule **or** `species` mixture, `n_molecules`, `composition`, Packmol |
 | `liquid` | Liquid / mixture / confined bulk | `species`, `box` *or* `density`, Packmol |
 | `intercalation` | Guests in a layered host | `host`, `guest`, `n_per_gallery`, `stage` |
 
-The `liquid` builder packs one or more molecular species into a periodic box —
-either a literal `box = [a, b, c]` (Å) or a cubic cell sized from a target mass
-`density` (g/cm³). Every packed molecule becomes its own `tc_fragment`:
+---
+
+## Mixtures — one `species` concept, everywhere
+
+Every builder that **places molecules** — `liquid`, `surface_packing` and
+`filled_nanotube` — speaks the same mixture language. A mixture is a list of
+**species**, each an *identity* plus an *amount*:
+
+- **identity**: exactly one of `molecule_name` (ASE g2), `smiles` (RDKit), or
+  `file` (any ASE-readable structure);
+- **amount**: an absolute `count`, **or** a relative `ratio`. Use one style per
+  mixture — all counts, or all ratios apportioned from the builder's total
+  `n_molecules` (largest-remainder rounding, so the parts always sum exactly).
+
+A single molecule is just the one-species shortcut: `molecule_name`/`smiles`/
+`file` directly on the builder (then `n_molecules` is how many copies). So these
+two are equivalent fillings of a nanotube:
+
+```toml
+# shortcut: 6 waters
+[geometry.builder]
+type = "filled_nanotube"
+molecule_name = "H2O"
+n_molecules = 6
+```
+
+```toml
+# mixture: 3 parts water, 1 part methane, 8 total -> 6 H2O + 2 CH4
+[geometry.builder]
+type = "filled_nanotube"
+n_molecules = 8
+
+[[geometry.builder.species]]
+molecule_name = "H2O"
+ratio = 3
+
+[[geometry.builder.species]]
+molecule_name = "CH4"
+ratio = 1
+```
+
+The same `[[...species]]` block drops into `surface_packing` (a mixed adlayer)
+and `liquid` (a solvent blend) unchanged. Every packed molecule becomes its own
+`tc_fragment`, and `provenance.extra["fragment_species"]` records which species
+each fragment is — so the MC sampler, constraints and downstream analysis can
+tell water from ethanol.
+
+The `liquid` builder packs the mixture into a periodic box — either a literal
+`box = [a, b, c]` (Å) or a cubic cell sized from a target mass `density`
+(g/cm³):
 
 ```toml
 [geometry.builder]
@@ -118,6 +165,34 @@ tolerance = 2.0
 molecule_name = "H2O"
 count = 32
 ```
+
+---
+
+## Mixed solids — `composition` (random solid solution)
+
+The lattice analogue of a molecular mixture is a **random substitutional alloy**.
+Any lattice builder — `crystal`, `slab`, `surface_adsorbate`, `surface_packing` —
+takes a `composition` list that swaps a fraction of host sites for other
+elements (chosen with the builder's `seed`, ratios apportioned over sites):
+
+```toml
+[geometry.builder]
+type             = "crystal"
+name             = "Cu"
+crystalstructure = "fcc"
+cubic            = true
+supercell        = [3, 3, 3]
+seed             = 11
+
+[[geometry.builder.composition]]
+element = "Au"
+ratio   = 0.25       # 25 % of the Cu sites become Au (remainder stays Cu)
+```
+
+Because mixtures and mixed solids compose, the richer combinations fall out for
+free: a solvent blend with a dissolved species (`liquid` mixture), a mixed
+adlayer on an **alloy** surface (`surface_packing` with both `species` and
+`composition`), and so on.
 
 The `intercalation` builder inserts guest atoms on an in-plane grid into each
 gallery of a **planar** layered host (graphene / hBN; `mx2` rejected). `stage`

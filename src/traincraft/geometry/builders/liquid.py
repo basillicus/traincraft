@@ -1,27 +1,22 @@
 """Builder: liquids, mixtures, and confined bulk via Packmol.
 
-Packs one or more molecular species into a periodic box. The box is either given
-explicitly (``box = [a, b, c]`` in Å) or derived from a target mass ``density``
-(g/cm³) for a cubic cell. Each packed molecule becomes its own ``tc_fragment``
-(numbered globally across species), so the MC sampler and constraints can address
-them individually.
+Packs one or more molecular :class:`Species` into a periodic box. The box is
+either given explicitly (``box = [a, b, c]`` in Å) or derived from a target mass
+``density`` (g/cm³) for a cubic cell. Amounts may be absolute (``count``) or
+relative (``ratio`` + a total ``n_molecules``). Each packed molecule becomes its
+own ``tc_fragment`` (numbered globally across species), so the MC sampler and
+constraints can address them individually.
 
-Reuses the Packmol/adsorbate machinery from the ``surface_*`` builders.
+The species/packing/tagging machinery is shared with the ``surface_packing`` and
+``filled_nanotube`` builders (see :mod:`.mixture`).
 """
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import tempfile
-from pathlib import Path
-
 import numpy as np
-from ase import Atoms
-from ase.io import read, write
 
 from ...core import Provenance, Structure, register, set_fragments
-from .surface import _canonical_smiles, _resolve_adsorbate
+from .mixture import resolve_mixture, run_packmol, tag_mixture
 
 _AMU_G = 1.66053906660e-24  # grams per atomic mass unit
 
@@ -33,60 +28,16 @@ def _cubic_edge_from_density(total_mass_amu: float, density: float) -> float:
     return edge_cm * 1.0e8  # cm -> Å
 
 
-def _run_packmol_multi(
-    species: list[tuple[Atoms, int]],
-    box: tuple[float, float, float],
-    margin: float,
-    tol: float,
-    seed: int,
-) -> Atoms:
-    """Pack several species (atoms, count) into ``box`` (Å), inset by ``margin``."""
-    if shutil.which("packmol") is None:
-        raise ImportError("liquid builder needs Packmol. Install it with: pixi install -e science")
-
-    a, b, c = box
-    lo, hi = margin, (a - margin, b - margin, c - margin)
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        out_file = tmp / "packed.xyz"
-        blocks = [f"tolerance {tol}", f"seed {seed}", f"output {out_file}", "filetype xyz", ""]
-        for i, (atoms, n) in enumerate(species):
-            sp_file = tmp / f"species_{i}.xyz"
-            write(str(sp_file), atoms, format="xyz")
-            blocks += [
-                f"structure {sp_file}",
-                f"  number {n}",
-                f"  inside box {lo:.4f} {lo:.4f} {lo:.4f} {hi[0]:.4f} {hi[1]:.4f} {hi[2]:.4f}",
-                "end structure",
-                "",
-            ]
-        inp_file = tmp / "pack.inp"
-        inp_file.write_text("\n".join(blocks))
-
-        with open(inp_file) as inp_fh:
-            result = subprocess.run(
-                ["packmol"], stdin=inp_fh, capture_output=True, text=True, timeout=300
-            )
-        if result.returncode != 0 or not out_file.exists():
-            raise RuntimeError(
-                f"Packmol failed (exit {result.returncode}):\n{result.stdout[-2000:]}"
-            )
-        return read(str(out_file), format="xyz")
-
-
 @register("builder", "liquid")
 def build_liquid(cfg) -> Structure:
-    # Resolve each species to an Atoms template + its count.
-    resolved: list[tuple[Atoms, int]] = []
-    for spec in cfg.species:
-        atoms = _resolve_adsorbate(spec.molecule_name, spec.smiles, spec.file)
-        resolved.append((atoms, spec.count))
+    # Resolve the mixture: [(atoms, count, label, canonical_smiles), ...].
+    resolved = resolve_mixture(cfg.species, cfg.n_molecules)
 
     # Box: explicit, or cubic from target density.
     if cfg.box is not None:
         box = tuple(float(x) for x in cfg.box)
     elif cfg.density is not None:
-        total_mass = sum(float(a.get_masses().sum()) * n for a, n in resolved)
+        total_mass = sum(float(a.get_masses().sum()) * n for a, n, _, _ in resolved)
         edge = _cubic_edge_from_density(total_mass, cfg.density)
         box = (edge, edge, edge)
     else:
@@ -95,27 +46,24 @@ def build_liquid(cfg) -> Structure:
     seed = cfg.seed if cfg.seed is not None else 12345
     # Inset packing by `tolerance` from each wall so molecules don't clash across
     # the periodic boundary (Packmol itself is not PBC-aware).
-    packed = _run_packmol_multi(resolved, box, margin=cfg.tolerance, tol=cfg.tolerance, seed=seed)
+    lo, m = cfg.tolerance, cfg.tolerance
+    region = (
+        f"inside box {lo:.4f} {lo:.4f} {lo:.4f} "
+        f"{box[0] - m:.4f} {box[1] - m:.4f} {box[2] - m:.4f}"
+    )
+    items = [(atoms, n) for atoms, n, _, _ in resolved]
+    packed = run_packmol(items, region, cfg.tolerance, seed, need="liquid builder")
 
     packed.set_cell(box)
     packed.set_pbc(cfg.pbc)
 
-    # Fragment tagging: every molecule (across all species) is its own fragment.
     frag = np.empty(len(packed), dtype=int)
-    fragment_smiles: dict[str, str] = {}
-    cursor = fid = 0
-    for (atoms, n), spec in zip(resolved, cfg.species, strict=True):
-        n_at = len(atoms)
-        canonical = _canonical_smiles(spec.smiles) if spec.smiles is not None else None
-        for _ in range(n):
-            frag[cursor : cursor + n_at] = fid
-            if canonical is not None:
-                fragment_smiles[str(fid)] = canonical
-            cursor += n_at
-            fid += 1
+    n_frag, fragment_smiles, fragment_species, _ = tag_mixture(frag, resolved, 0)
     set_fragments(packed, frag)
 
-    extra: dict = {"n_molecules": int(fid), "box": [round(x, 4) for x in box]}
+    extra: dict = {"n_molecules": int(n_frag), "box": [round(x, 4) for x in box]}
+    if fragment_species:
+        extra["fragment_species"] = fragment_species
     if fragment_smiles:
         extra["fragment_smiles"] = fragment_smiles
 

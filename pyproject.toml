@@ -151,6 +151,8 @@ example-17 = { cmd = "traincraft run examples/17_water_box_liquid.toml", descrip
 example-18 = { cmd = "traincraft run examples/18_label_after_select.toml", description = "Build->sample->select->LABEL (DFT labeling stage; EMT stand-in, no extra deps)" }
 example-21 = { cmd = "traincraft run examples/21_train_mace_finetune.toml", description = "Build->...->dataset->TRAIN a MACE foundation model (needs mace env)" }
 example-22 = { cmd = "traincraft run examples/22_filled_nanotube.toml", description = "CNT randomly filled with water (filled_nanotube builder) + xTB MD (needs science env)" }
+example-23 = { cmd = "traincraft run examples/23_solvent_mixture.toml", description = "Water/ethanol solvent blend by ratio (liquid mixture) + xTB MD (needs science env)" }
+example-24 = { cmd = "traincraft run examples/24_cuau_alloy_md.toml", description = "Random Cu/Au substitutional alloy (composition) + EMT MD (no extra deps)" }
 
 # Docs tasks live on the `docs` feature so they only exist in the `docs`
 # environment — `pixi run docs-serve` then auto-selects that env (no `-e docs`).

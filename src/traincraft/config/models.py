@@ -8,6 +8,7 @@ here plus a registry entry. ``extra="forbid"`` makes typos fail fast.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
@@ -108,6 +109,108 @@ SourceConfig = Annotated[
 
 
 # ----------------------------------------------------------------------- builders
+# --- shared "mixture" primitives (reused by every builder that places matter) ---
+class Species(TCModel):
+    """One component of a *mixture* — an identity plus an amount.
+
+    **Identity** — exactly one of ``molecule_name`` (an ASE g2 name), ``smiles``
+    (built with RDKit), or ``file`` (any ASE-readable structure).
+
+    **Amount** — either an absolute ``count`` (how many copies) *or* a relative
+    ``ratio``. Within one mixture use a single style: all counts, or all ratios
+    (apportioned from the builder's total number of molecules). A bare species
+    (neither given) is one copy in count mode, or an equal share in ratio mode.
+
+    This one model is reused by every builder that *places molecules* — the
+    ``liquid``, ``surface_packing`` and ``filled_nanotube`` builders — so a
+    solvent blend, a mixed adlayer and a co-filled nanotube are all written the
+    same way.
+    """
+
+    molecule_name: str | None = None
+    smiles: str | None = None
+    file: FsPath | None = None
+    count: int | None = None
+    ratio: float | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> Species:
+        if sum(x is not None for x in (self.molecule_name, self.smiles, self.file)) != 1:
+            raise ValueError(
+                "species needs exactly one of 'molecule_name', 'smiles', 'file'"
+            )
+        if self.count is not None and self.ratio is not None:
+            raise ValueError("species: set 'count' or 'ratio', not both")
+        if self.count is not None and self.count < 1:
+            raise ValueError("species 'count' must be >= 1")
+        if self.ratio is not None and self.ratio <= 0:
+            raise ValueError("species 'ratio' must be > 0")
+        return self
+
+    @property
+    def label(self) -> str:
+        """A short identity label for provenance (per-fragment species map)."""
+        if self.molecule_name is not None:
+            return self.molecule_name
+        if self.smiles is not None:
+            return self.smiles
+        return Path(str(self.file)).stem
+
+
+# Back-compat alias: the original name when only the liquid builder had species.
+LiquidSpecies = Species
+
+
+class AlloyComponent(TCModel):
+    """One substituent of a random *solid solution* (a "mixed solid"): an
+    ``element`` replacing a ``ratio`` fraction of the host lattice sites. Several
+    components may be stacked; their ratios must sum to <= 1 (the remainder stays
+    the host element). Substituted sites are chosen with the builder's seed.
+    """
+
+    element: str
+    ratio: float
+
+    @model_validator(mode="after")
+    def _check(self) -> AlloyComponent:
+        if not 0.0 < self.ratio <= 1.0:
+            raise ValueError("alloy component 'ratio' must be in (0, 1]")
+        return self
+
+
+def _check_mixture(
+    species: list[Species],
+    single: tuple,
+    *,
+    name: str,
+    require_single: bool = True,
+) -> None:
+    """Validate a builder's species-list vs. single-molecule shortcut.
+
+    ``single`` is ``(molecule_name, smiles, file)``. A builder may use *either*
+    the single-molecule shortcut *or* a ``[[...species]]`` list — never both.
+    Within a list, explicit ``count`` and ``ratio`` may not be mixed.
+    """
+    has_single = sum(x is not None for x in single)
+    if species:
+        if has_single:
+            raise ValueError(
+                f"{name}: use either a single molecule_name/smiles/file "
+                "OR a 'species' list, not both"
+            )
+        counts = any(s.count is not None for s in species)
+        ratios = any(s.ratio is not None for s in species)
+        if counts and ratios:
+            raise ValueError(
+                f"{name}: don't mix species 'count' and 'ratio' in one mixture"
+            )
+    elif require_single and has_single != 1:
+        raise ValueError(
+            f"{name} needs exactly one of 'molecule_name', 'smiles', 'file' "
+            "(or a 'species' list)"
+        )
+
+
 class NanotubeBuilder(TCModel):
     type: Literal["nanotube"] = "nanotube"
     n: int = 8
@@ -132,11 +235,13 @@ class FilledNanotubeBuilder(TCModel):
     length: int = 6
     bond: float = 1.42
     vacuum: float = 8.0
-    # guest species: exactly one of molecule_name | smiles | file
+    # guest: a single molecule (molecule_name | smiles | file) OR a mixture
+    # (a 'species' list — fill the tube with several molecules at given ratios).
     molecule_name: str | None = None  # ase.build.molecule g2 name (e.g. "H2O")
     smiles: str | None = None
     file: FsPath | None = None
-    n_molecules: int = 4
+    species: list[Species] = Field(default_factory=list)
+    n_molecules: int = 4  # single mode: copies; ratio mixture: total guests
     # packing geometry
     radial_margin: float = 1.8  # Å gap between guests and the tube wall (≈ vdW)
     axial_margin: float = 1.5  # Å inset at each tube end (avoids PBC clashes along z)
@@ -146,10 +251,10 @@ class FilledNanotubeBuilder(TCModel):
 
     @model_validator(mode="after")
     def _one_guest(self) -> FilledNanotubeBuilder:
-        if sum(x is not None for x in (self.molecule_name, self.smiles, self.file)) != 1:
-            raise ValueError(
-                "filled_nanotube needs exactly one of 'molecule_name', 'smiles', or 'file'"
-            )
+        _check_mixture(
+            self.species, (self.molecule_name, self.smiles, self.file),
+            name="filled_nanotube",
+        )
         if self.n_molecules < 1:
             raise ValueError("filled_nanotube needs n_molecules >= 1")
         return self
@@ -202,6 +307,9 @@ class CrystalBuilder(TCModel):
     orthorhombic: bool = False
     supercell: tuple[int, int, int] = (1, 1, 1)
     defects: list[DefectSpec] = Field(default_factory=list)
+    # random solid solution: replace a fraction of host sites with each element
+    composition: list[AlloyComponent] = Field(default_factory=list)
+    seed: int | None = None  # seeds the random site substitution
 
 
 class SlabBuilder(TCModel):
@@ -219,6 +327,9 @@ class SlabBuilder(TCModel):
     vacuum: float = 12.0
     orthogonal: bool = False  # facet mode
     periodic: bool = False  # miller mode: keep periodic along the surface normal
+    # random solid solution: turn the slab into a mixed-solid (alloy) surface
+    composition: list[AlloyComponent] = Field(default_factory=list)
+    seed: int | None = None  # seeds the random site substitution
 
     @model_validator(mode="after")
     def _one_mode(self) -> SlabBuilder:
@@ -236,6 +347,8 @@ class SurfaceAdsorbateBuilder(TCModel):
     facet: _FACETS = "fcc111"
     size: tuple[int, int, int] = (3, 3, 4)
     vacuum: float = 12.0
+    composition: list[AlloyComponent] = Field(default_factory=list)  # mixed-solid slab
+    seed: int | None = None  # seeds the random site substitution
     # adsorbate: exactly one of molecule_name | smiles | file
     molecule_name: str | None = None  # ase.build.molecule g2 name
     smiles: str | None = None
@@ -261,12 +374,15 @@ class SurfacePackingBuilder(TCModel):
     facet: _FACETS = "fcc111"
     size: tuple[int, int, int] = (4, 4, 4)
     vacuum: float = 20.0
-    # adsorbate molecules to pack above the slab: exactly one
+    composition: list[AlloyComponent] = Field(default_factory=list)  # mixed-solid slab
+    # adsorbate: a single molecule (molecule_name | smiles | file) OR a 'species'
+    # mixture (pack several adsorbate species above the slab at given ratios).
     molecule_name: str | None = None
     smiles: str | None = None
     file: FsPath | None = None
+    species: list[Species] = Field(default_factory=list)
     # packing parameters
-    n_molecules: int = 4
+    n_molecules: int = 4  # single mode: copies; ratio mixture: total adsorbates
     tolerance: float = 2.0
     region_height: float = 8.0
     gap: float = 2.0
@@ -274,11 +390,10 @@ class SurfacePackingBuilder(TCModel):
 
     @model_validator(mode="after")
     def _one_adsorbate(self) -> SurfacePackingBuilder:
-        n = sum(x is not None for x in (self.molecule_name, self.smiles, self.file))
-        if n != 1:
-            raise ValueError(
-                "surface_packing needs exactly one of 'molecule_name', 'smiles', or 'file'"
-            )
+        _check_mixture(
+            self.species, (self.molecule_name, self.smiles, self.file),
+            name="surface_packing",
+        )
         return self
 
 
@@ -295,25 +410,10 @@ class LayeredBuilder(TCModel):
     vacuum: float = 15.0
 
 
-class LiquidSpecies(TCModel):
-    # exactly one of molecule_name | smiles | file identifies the species
-    molecule_name: str | None = None
-    smiles: str | None = None
-    file: FsPath | None = None
-    count: int = 1
-
-    @model_validator(mode="after")
-    def _one_source(self) -> LiquidSpecies:
-        if sum(x is not None for x in (self.molecule_name, self.smiles, self.file)) != 1:
-            raise ValueError(
-                "liquid species needs exactly one of 'molecule_name', 'smiles', 'file'"
-            )
-        return self
-
-
 class LiquidBuilder(TCModel):
     type: Literal["liquid"] = "liquid"
-    species: list[LiquidSpecies]
+    species: list[Species]
+    n_molecules: int | None = None  # total for ratio-based mixtures
     box: tuple[float, float, float] | None = None  # explicit cell edges (Å)
     density: float | None = None  # g/cm³; cubic box derived when 'box' is unset
     tolerance: float = 2.0  # Packmol min separation / wall inset (Å)
@@ -324,6 +424,13 @@ class LiquidBuilder(TCModel):
     def _box_or_density(self) -> LiquidBuilder:
         if not self.species:
             raise ValueError("liquid builder needs at least one species")
+        if any(s.ratio is not None for s in self.species):
+            if any(s.count is not None for s in self.species):
+                raise ValueError(
+                    "liquid: don't mix species 'count' and 'ratio' in one mixture"
+                )
+            if self.n_molecules is None:
+                raise ValueError("ratio-based liquid mixture needs 'n_molecules'")
         if (self.box is None) == (self.density is None):
             raise ValueError("liquid builder needs exactly one of 'box' or 'density'")
         return self

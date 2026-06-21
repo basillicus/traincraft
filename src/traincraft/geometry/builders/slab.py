@@ -16,6 +16,7 @@ import numpy as np
 
 from ...core import FRAMEWORK, Provenance, Structure, register, set_fragments
 from ._common import build_miller_slab, build_named_slab
+from .alloy import apply_solid_solution
 
 
 @register("builder", "slab")
@@ -41,10 +42,15 @@ def build_slab(cfg) -> Structure:
         miller_str = "".join(str(i) for i in cfg.miller)
         tag = f"{cfg.element}-{miller_str}"
 
+    slab, composition = apply_solid_solution(slab, cfg.composition, cfg.seed)
+
     # A bare slab is all framework; nothing is mobile yet.
     set_fragments(slab, np.full(len(slab), FRAMEWORK, dtype=int))
 
+    extra = {"composition": composition} if composition else {}
     return Structure.from_ase(
         slab,
-        provenance=Provenance(origin="generated", source=f"builder:slab:{tag}"),
+        provenance=Provenance(
+            origin="generated", source=f"builder:slab:{tag}", extra=extra
+        ),
     )

@@ -1,0 +1,41 @@
+[run]
+name = "cuau_alloy_md"
+seed = 11
+outdir = "runs"
+# A random substitutional alloy ("mixed solid"): a Cu fcc lattice with 25 % of
+# sites swapped for Au, chosen randomly with the run seed, then EMT + MD.
+# Demonstrates the `composition` field — the lattice analogue of a molecular
+# mixture (same ratio idea, apportioned over sites). Also works on `slab`,
+# `surface_adsorbate` and `surface_packing` to make a mixed-solid surface.
+# EMT handles Cu+Au, so zero extra deps.
+# Run with:  pixi run example-24
+
+[geometry.builder]
+type             = "crystal"
+name             = "Cu"
+crystalstructure = "fcc"
+a                = 3.7
+cubic            = true
+supercell        = [3, 3, 3]
+seed             = 11        # seeds the random site substitution
+
+[[geometry.builder.composition]]
+element = "Au"
+ratio   = 0.25              # replace 25 % of the Cu sites with Au
+
+[calculator]
+type = "emt"
+
+[sampling]
+type        = "md"
+temperature = 600.0
+steps       = 200
+interval    = 20
+timestep    = 2.0
+
+[selection]
+steps  = ["physicality", "dedup", "diversity"]
+budget = 8
+
+[dataset]
+path = "dataset"

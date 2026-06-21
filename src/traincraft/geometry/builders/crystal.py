@@ -18,6 +18,7 @@ import numpy as np
 from ase.build import bulk
 
 from ...core import Provenance, Structure, register
+from .alloy import apply_solid_solution
 
 
 def _apply_defects(atoms, defects):
@@ -76,6 +77,10 @@ def build_crystal(cfg) -> Structure:
             {"kind": d.kind, "index": d.index, "element": d.element}
             for d in cfg.defects
         ]
+
+    if cfg.composition:
+        atoms, composition = apply_solid_solution(atoms, cfg.composition, cfg.seed)
+        extra["composition"] = composition
 
     return Structure.from_ase(
         atoms,

@@ -100,6 +100,38 @@ Requires RDKit (`pixi install -e science`).
 
 ## Builders
 
+### Shared blocks: `Species` and `AlloyComponent`
+
+Two small blocks are reused across builders.
+
+**`Species`** — one component of a *mixture*. Used by `liquid`,
+`surface_packing` and `filled_nanotube` (as a `[[geometry.builder.species]]`
+list). Provide exactly one *identity* and at most one *amount*:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `molecule_name` | `str \| null` | `null` | ASE g2 name (identity) |
+| `smiles` | `str \| null` | `null` | SMILES, built with RDKit (identity) |
+| `file` | `str \| null` | `null` | Path to a structure file (identity) |
+| `count` | `int \| null` | `null` | Absolute number of copies |
+| `ratio` | `float \| null` | `null` | Relative share (apportioned from `n_molecules`) |
+
+Within one mixture use a single amount style — all `count`, or all `ratio`
+(then the builder's `n_molecules` is the total). A bare species is one copy
+(count mode) or an equal share (ratio mode).
+
+**`AlloyComponent`** — one substituent of a *random solid solution*. Used by
+`crystal`, `slab`, `surface_adsorbate` and `surface_packing` (as a
+`[[geometry.builder.composition]]` list):
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `element` | `str` | required | Element to substitute in |
+| `ratio` | `float` | required | Fraction of host sites to replace, in (0, 1] |
+
+Component ratios must sum to ≤ 1 (the remainder stays the host element);
+substituted sites are picked with the builder's `seed`.
+
 ### `type = "nanotube"`
 
 | Field | Type | Default | Description |
@@ -125,19 +157,21 @@ Packmol binary (`pixi install -e science`).
 | `length` | `int` | `6` | Unit cells along the tube axis |
 | `bond` | `float` | `1.42` | C–C bond length in Å |
 | `vacuum` | `float` | `8.0` | Radial vacuum in Å |
-| `molecule_name` | `str \| null` | `null` | ASE g2 guest name (e.g. `"H2O"`) |
-| `smiles` | `str \| null` | `null` | SMILES guest (needs RDKit) |
-| `file` | `str \| null` | `null` | Path to a guest structure file |
-| `n_molecules` | `int` | `4` | Number of guests to pack inside |
+| `molecule_name` | `str \| null` | `null` | Single guest: ASE g2 name (e.g. `"H2O"`) |
+| `smiles` | `str \| null` | `null` | Single guest: SMILES (needs RDKit) |
+| `file` | `str \| null` | `null` | Single guest: path to a structure file |
+| `species` | `list[Species]` | `[]` | A *mixture* of guests (alternative to the single-guest fields) |
+| `n_molecules` | `int` | `4` | Single mode: copies; ratio mixture: total guests |
 | `radial_margin` | `float` | `1.8` | Gap between guests and the tube wall (Å) |
 | `axial_margin` | `float` | `1.5` | Inset at each tube end (Å; avoids PBC clashes) |
 | `tolerance` | `float` | `2.0` | Packmol minimum separation (Å) |
 | `pbc` | `bool` | `true` | Periodic along the tube axis |
 | `seed` | `int \| null` | `null` | Packmol seed |
 
-Exactly one of `molecule_name`, `smiles`, or `file` must be set. The builder
-raises if the tube is too narrow/short to hold the requested guests — widen
-(`n`/`m`), lengthen (`length`), or reduce the margins.
+Use **either** a single guest (`molecule_name`/`smiles`/`file`) **or** a
+`species` mixture — not both. The builder raises if the tube is too
+narrow/short to hold the requested guests — widen (`n`/`m`), lengthen
+(`length`), or reduce the margins.
 
 ### `type = "molecule"`
 
@@ -160,6 +194,8 @@ raises if the tube is too narrow/short to hold the requested guests — widen
 | `orthorhombic` | `bool` | `false` | Use the orthorhombic cell |
 | `supercell` | `[int, int, int]` | `[1, 1, 1]` | Supercell repetitions |
 | `defects` | `list[DefectSpec]` | `[]` | Point defects to introduce |
+| `composition` | `list[AlloyComponent]` | `[]` | Random solid solution (mixed solid) |
+| `seed` | `int \| null` | `null` | Seeds the random site substitution |
 
 **`DefectSpec`:**
 
@@ -187,6 +223,8 @@ raises if the tube is too narrow/short to hold the requested guests — widen
 | `vacuum` | `float` | `12.0` | Total vacuum in Å |
 | `orthogonal` | `bool` | `false` | Request an orthogonal cell (facet mode) |
 | `periodic` | `bool` | `false` | Keep periodic along the surface normal (Miller mode) |
+| `composition` | `list[AlloyComponent]` | `[]` | Random solid solution (mixed-solid slab) |
+| `seed` | `int \| null` | `null` | Seeds the random site substitution |
 
 **`facet` values:** `fcc111`, `fcc100`, `fcc110`, `bcc110`, `bcc100`, `bcc111`, `hcp0001`
 
@@ -212,6 +250,8 @@ raises if the tube is too narrow/short to hold the requested guests — widen
 | `facet` | `str` | `"fcc111"` | Named facet |
 | `size` | `[int, int, int]` | `[3, 3, 4]` | Slab size |
 | `vacuum` | `float` | `12.0` | Total vacuum in Å |
+| `composition` | `list[AlloyComponent]` | `[]` | Random solid solution (mixed-solid slab) |
+| `seed` | `int \| null` | `null` | Seeds the random site substitution |
 | `molecule_name` | `str \| null` | `null` | ASE g2 adsorbate name |
 | `smiles` | `str \| null` | `null` | SMILES adsorbate |
 | `file` | `str \| null` | `null` | Path to adsorbate file |
@@ -223,15 +263,37 @@ Exactly one of `molecule_name`, `smiles`, or `file` must be set.
 
 ### `type = "surface_packing"`
 
-All `surface_adsorbate` substrate parameters, plus:
+All `surface_adsorbate` substrate parameters (including `composition` for a
+mixed-solid slab), plus:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `n_molecules` | `int` | `4` | Number of adsorbate copies to pack |
+| `species` | `list[Species]` | `[]` | A *mixture* of adsorbates (alternative to a single molecule) |
+| `n_molecules` | `int` | `4` | Single mode: copies; ratio mixture: total adsorbates |
 | `tolerance` | `float` | `2.0` | Packmol intermolecular distance (Å) |
 | `region_height` | `float` | `8.0` | Height of the packing box above the slab (Å) |
 | `gap` | `float` | `2.0` | Clearance between slab top and packing box (Å) |
+| `seed` | `int \| null` | `null` | Packmol seed / substitution seed |
+
+Use **either** a single adsorbate (`molecule_name`/`smiles`/`file`) **or** a
+`species` mixture — not both.
+
+### `type = "liquid"`
+
+Packs a `species` mixture into a periodic box (a liquid, a solvent blend, or
+confined bulk). Requires the Packmol binary (`pixi install -e science`).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `species` | `list[Species]` | required | The mixture to pack (≥ 1 species) |
+| `n_molecules` | `int \| null` | `null` | Total for ratio-based mixtures |
+| `box` | `[float, float, float] \| null` | `null` | Explicit cell edges in Å |
+| `density` | `float \| null` | `null` | g/cm³; a cubic box is sized when `box` is unset |
+| `tolerance` | `float` | `2.0` | Packmol min separation / wall inset (Å) |
+| `pbc` | `bool` | `true` | Periodic cell |
 | `seed` | `int \| null` | `null` | Packmol seed |
+
+Set exactly one of `box` or `density`. Ratio-based mixtures need `n_molecules`.
 
 ---
 

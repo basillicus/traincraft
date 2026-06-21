@@ -1,30 +1,27 @@
 """Builder: a carbon nanotube randomly filled with molecules ("fillMyTubes").
 
-The original driver for this project: take a CNT and stuff N small molecules
-inside it, then sample/label to study (e.g.) confined-phase Raman. Packmol packs
-the guests into a cylinder coaxial with the tube and just narrower than its wall;
-the tube carbons are tagged framework (``tc_fragment == -1``) and every guest
-molecule gets its own fragment id, so the MC sampler and the ``constraints``
-transform can address tube and guests separately.
+The original driver for this project: take a CNT and stuff molecules inside it,
+then sample/label to study (e.g.) confined-phase Raman. Packmol packs the guests
+into a cylinder coaxial with the tube and just narrower than its wall; the tube
+carbons are tagged framework (``tc_fragment == -1``) and every guest molecule
+gets its own fragment id, so the MC sampler and the ``constraints`` transform can
+address tube and guests separately.
 
-Reuses the Packmol/adsorbate machinery from the ``surface_*``/``liquid`` builders;
-only the Packmol *region* differs (``inside cylinder`` rather than ``inside box``).
+The guest may be a single molecule (``molecule_name``/``smiles``/``file``) or a
+*mixture* (a ``species`` list with counts or ratios) — the same species/packing
+machinery used by the ``liquid`` and ``surface_packing`` builders (see
+:mod:`.mixture`). Only the Packmol *region* differs (``inside cylinder``).
 """
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import tempfile
-from pathlib import Path
-
 import numpy as np
 from ase import Atoms
 from ase.build import nanotube
-from ase.io import read, write
 
+from ...config.models import Species
 from ...core import FRAMEWORK, Provenance, Structure, register, set_fragments
-from .surface import _canonical_smiles, _resolve_adsorbate
+from .mixture import resolve_mixture, run_packmol, tag_mixture
 
 
 def _tube_axis_and_radius(cnt: Atoms) -> tuple[float, float, float]:
@@ -35,53 +32,18 @@ def _tube_axis_and_radius(cnt: Atoms) -> tuple[float, float, float]:
     return float(cx), float(cy), float(radii.mean())
 
 
-def _run_packmol_cylinder(
-    guest: Atoms,
-    n: int,
-    *,
-    centre: tuple[float, float],
-    z_lo: float,
-    length: float,
-    radius: float,
-    tol: float,
-    seed: int,
-) -> Atoms:
-    """Pack ``n`` copies of ``guest`` inside a z-aligned cylinder via Packmol."""
-    if shutil.which("packmol") is None:
-        raise ImportError(
-            "filled_nanotube needs Packmol. Install it with: pixi install -e science"
+def _guest_species(cfg) -> list[Species]:
+    """The single-molecule shortcut becomes a one-element mixture."""
+    if cfg.species:
+        return list(cfg.species)
+    return [
+        Species(
+            molecule_name=cfg.molecule_name,
+            smiles=cfg.smiles,
+            file=cfg.file,
+            count=cfg.n_molecules,
         )
-    cx, cy = centre
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        out_file = tmp / "packed.xyz"
-        guest_file = tmp / "guest.xyz"
-        write(str(guest_file), guest, format="xyz")
-        # inside cylinder a1 a2 a3 d1 d2 d3 r l  — base centre, axis direction, radius, length
-        blocks = [
-            f"tolerance {tol}",
-            f"seed {seed}",
-            f"output {out_file}",
-            "filetype xyz",
-            "",
-            f"structure {guest_file}",
-            f"  number {n}",
-            f"  inside cylinder {cx:.4f} {cy:.4f} {z_lo:.4f} 0. 0. 1. {radius:.4f} {length:.4f}",
-            "end structure",
-            "",
-        ]
-        inp_file = tmp / "pack.inp"
-        inp_file.write_text("\n".join(blocks))
-        with open(inp_file) as inp_fh:
-            result = subprocess.run(
-                ["packmol"], stdin=inp_fh, capture_output=True, text=True, timeout=300
-            )
-        if result.returncode != 0 or not out_file.exists():
-            raise RuntimeError(
-                f"Packmol failed (exit {result.returncode}); the tube may be too "
-                f"narrow/short for {n} guest(s). Output:\n{result.stdout[-2000:]}"
-            )
-        return read(str(out_file), format="xyz")
+    ]
 
 
 @register("builder", "filled_nanotube")
@@ -100,18 +62,15 @@ def build_filled_nanotube(cfg) -> Structure:
             "or reduce radial_margin/axial_margin."
         )
 
-    guest = _resolve_adsorbate(cfg.molecule_name, cfg.smiles, cfg.file)
+    resolved = resolve_mixture(_guest_species(cfg), cfg.n_molecules)
     seed = cfg.seed if cfg.seed is not None else 12345
-    guests = _run_packmol_cylinder(
-        guest,
-        cfg.n_molecules,
-        centre=(cx, cy),
-        z_lo=cfg.axial_margin,
-        length=pack_length,
-        radius=pack_radius,
-        tol=cfg.tolerance,
-        seed=seed,
+    # inside cylinder a1 a2 a3 d1 d2 d3 r l — base centre, axis direction, radius, length
+    region = (
+        f"inside cylinder {cx:.4f} {cy:.4f} {cfg.axial_margin:.4f} 0. 0. 1. "
+        f"{pack_radius:.4f} {pack_length:.4f}"
     )
+    items = [(atoms, n) for atoms, n, _, _ in resolved]
+    guests = run_packmol(items, region, cfg.tolerance, seed, need="filled_nanotube")
 
     # Combine: tube first (framework), then the packed guests (one fragment each).
     system = cnt + guests
@@ -120,21 +79,18 @@ def build_filled_nanotube(cfg) -> Structure:
 
     frag = np.empty(len(system), dtype=int)
     frag[: len(cnt)] = FRAMEWORK
-    n_at = len(guest)
-    cursor = len(cnt)
-    for fid in range(cfg.n_molecules):
-        frag[cursor : cursor + n_at] = fid
-        cursor += n_at
+    n_frag, fragment_smiles, fragment_species, _ = tag_mixture(frag, resolved, len(cnt))
     set_fragments(system, frag)
 
     extra: dict = {
-        "n_molecules": cfg.n_molecules,
+        "n_molecules": int(n_frag),
         "tube_radius": round(radius, 4),
         "pack_radius": round(pack_radius, 4),
     }
-    if cfg.smiles is not None:
-        canonical = _canonical_smiles(cfg.smiles)
-        extra["fragment_smiles"] = {str(i): canonical for i in range(cfg.n_molecules)}
+    if fragment_species:
+        extra["fragment_species"] = fragment_species
+    if fragment_smiles:
+        extra["fragment_smiles"] = fragment_smiles
 
     return Structure.from_ase(
         system,

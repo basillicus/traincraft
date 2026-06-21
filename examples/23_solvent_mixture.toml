@@ -1,0 +1,44 @@
+[run]
+name = "solvent_mixture"
+seed = 5
+outdir = "runs"
+# A binary solvent blend packed by Packmol: 3 parts water to 1 part ethanol,
+# 24 molecules total. Demonstrates the shared `species` mixture with *ratios*
+# (apportioned to integer counts) — the same syntax works for surface_packing
+# and filled_nanotube. Each molecule is its own fragment, tagged by species in
+# provenance.extra["fragment_species"]. Needs the science env (Packmol + RDKit
+# for the SMILES ethanol + tblite for C/H/O).
+# Run with:  pixi run -e science traincraft run examples/23_solvent_mixture.toml
+
+[geometry.builder]
+type        = "liquid"
+n_molecules = 24            # total; ratios below are apportioned to integers
+box         = [20.0, 20.0, 20.0]   # Å (or use `density` for an auto-sized cube)
+tolerance   = 2.0
+pbc         = true
+
+[[geometry.builder.species]]
+molecule_name = "H2O"
+ratio         = 3           # -> 18 waters
+
+[[geometry.builder.species]]
+smiles = "CCO"              # ethanol
+ratio  = 1                  # -> 6 ethanols
+
+[calculator]
+type   = "tblite"
+method = "GFN2-xTB"
+
+[sampling]
+type        = "md"
+temperature = 300.0
+steps       = 200
+interval    = 20
+timestep    = 0.5
+
+[selection]
+steps  = ["physicality", "dedup", "diversity"]
+budget = 8
+
+[dataset]
+path = "dataset"
