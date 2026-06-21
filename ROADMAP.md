@@ -265,12 +265,15 @@ Acceptance
 - Full public API docs + library-usage tutorials (including the Raman use case).
 - Additional MLIP backends (MatterSim/Orb/SevenNet/CHGNet) via the model registry.
 - Deferred, architecture-friendly: **agent workbench** — a purpose-built web UI
-  (served from the VM, no X server needed) that pairs the conversational agent
-  of `docs/tutorials/11-ai-agent.md` with tabbed views over one workflow. It is
+  (served from the VM, no X server needed) that pairs a conversational agent
+  (workflow pattern in `docs/tutorials/11-ai-agent.md`) with tabbed views over
+  one workflow. It is
   a front-end over the existing TOML spine (same configs the CLI/agent run — no
   parallel logic):
-  - **Chat** — drive the whole pipeline in plain language; the agent writes,
-    validates and runs configs and reports back inline.
+  - **Chat** — driven by **Pi.dev** (https://pi.dev) as the agent backend, not a
+    homegrown loop. Pi.dev does the agentic work (reading the schema, writing,
+    validating and running configs); the workbench just renders the conversation
+    and its results inline.
   - **Geometry** — interactive WebGL 3D of the structure just built
     (weas-widget / py3Dmol), with natural-language edits round-tripping to the
     agent.

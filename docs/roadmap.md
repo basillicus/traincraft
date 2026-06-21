@@ -156,13 +156,15 @@ Parallel execution of the active-learning loop.
 ### Agent workbench — a purpose-built web UI
 
 A single browser app, served from the VM (WebGL rendering needs no X server),
-that combines the conversational agent of
-[Tutorial 11](tutorials/11-ai-agent.md) with tabbed views over one workflow.
+that combines a conversational agent (the workflow pattern is introduced in
+[Tutorial 11](tutorials/11-ai-agent.md)) with tabbed views over one workflow.
 It is a *front-end over the existing TOML spine* — the same configs the CLI and
 agent already use, no parallel logic:
 
-- **Chat** — drive the whole pipeline in plain language; the agent writes,
-  validates and runs configs and reports back inline.
+- **Chat** — driven by **[Pi.dev](https://pi.dev)** as the agent backend (not a
+  homegrown loop); Pi.dev does the agentic work — reading the schema, writing,
+  validating and running configs — and the workbench renders the conversation
+  and its results inline.
 - **Geometry** — interactive 3D of the structure the agent just built
   (weas-widget / py3Dmol), with natural-language edits round-tripping to the
   agent.
