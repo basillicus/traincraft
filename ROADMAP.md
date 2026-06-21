@@ -264,8 +264,24 @@ Acceptance
 
 - Full public API docs + library-usage tutorials (including the Raman use case).
 - Additional MLIP backends (MatterSim/Orb/SevenNet/CHGNet) via the model registry.
-- Deferred, architecture-friendly: **node-based workflow editor** emitting the
-  serialized TOML DAG.
+- Deferred, architecture-friendly: **agent workbench** — a purpose-built web UI
+  (served from the VM, no X server needed) that pairs the conversational agent
+  of `docs/tutorials/11-ai-agent.md` with tabbed views over one workflow. It is
+  a front-end over the existing TOML spine (same configs the CLI/agent run — no
+  parallel logic):
+  - **Chat** — drive the whole pipeline in plain language; the agent writes,
+    validates and runs configs and reports back inline.
+  - **Geometry** — interactive WebGL 3D of the structure just built
+    (weas-widget / py3Dmol), with natural-language edits round-tripping to the
+    agent.
+  - **Workflow** — the **node-based editor**: the pipeline DAG (geometry →
+    sample → select → label → dataset → train) as nodes, edited visually and
+    (de)serialised to/from the TOML the CLI runs.
+  - **Dataset** — interactive exploration with **chemiscope**
+    (https://github.com/lab-cosmo/chemiscope): structure–property maps linked to
+    per-frame structures, descriptors, energies and forces.
+
+  Likely Streamlit/Gradio + stmol/py3Dmol + the chemiscope widget. Details TBD.
 
 ---
 

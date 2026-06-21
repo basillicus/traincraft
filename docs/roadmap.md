@@ -152,7 +152,29 @@ Parallel execution of the active-learning loop.
 
 - Full public API docs + library-usage tutorials (including Raman use case)
 - Additional MLIP backends: MatterSim, Orb, SevenNet, CHGNet
-- Node-based workflow editor emitting serialised TOML
+
+### Agent workbench — a purpose-built web UI
+
+A single browser app, served from the VM (WebGL rendering needs no X server),
+that combines the conversational agent of
+[Tutorial 11](tutorials/11-ai-agent.md) with tabbed views over one workflow.
+It is a *front-end over the existing TOML spine* — the same configs the CLI and
+agent already use, no parallel logic:
+
+- **Chat** — drive the whole pipeline in plain language; the agent writes,
+  validates and runs configs and reports back inline.
+- **Geometry** — interactive 3D of the structure the agent just built
+  (weas-widget / py3Dmol), with natural-language edits round-tripping to the
+  agent.
+- **Workflow** — the node-based editor: the pipeline DAG (geometry → sample →
+  select → label → dataset → train) as nodes, edited visually and
+  (de)serialised to/from the TOML the CLI runs.
+- **Dataset** — interactive exploration of the generated dataset with
+  [chemiscope](https://github.com/lab-cosmo/chemiscope) (structure–property
+  maps linked to per-frame structures, descriptors, energies and forces).
+
+Likely Streamlit/Gradio + stmol/py3Dmol + the chemiscope widget; the node editor
+emits the serialised TOML DAG. Details TBD.
 
 ---
 
