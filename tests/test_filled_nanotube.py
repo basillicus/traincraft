@@ -73,14 +73,14 @@ def test_tube_too_small_raises():
         )
 
 
-def test_narrow_tube_refused_by_vdw_before_packmol():
-    # An (8,0) tube physically cannot hold water without overlapping the wall;
-    # the vdW sizing rejects it up front (no Packmol needed) with a clear message.
-    with pytest.raises(ValueError, match="too small to fill without overlap"):
+def test_tiny_tube_refused_before_packmol():
+    # A (4,0) tube's cavity is narrower than a carbon's vdW radius, so the cylinder
+    # would be non-positive; rejected up front (no Packmol needed) with a clear msg.
+    with pytest.raises(ValueError, match="too small to fill"):
         build_geometry(
             GeometryConfig(
                 builder=FilledNanotubeBuilder(
-                    n=8, m=0, length=5, molecule_name="H2O", n_molecules=5
+                    n=4, m=0, length=5, molecule_name="H2O", n_molecules=2
                 )
             )
         )

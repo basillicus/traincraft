@@ -45,14 +45,6 @@ def vdw_radius(symbol: str) -> float:
     return float(r)
 
 
-def max_vdw_radius(resolved: list[tuple]) -> float:
-    """Largest van der Waals radius among all atoms in a resolved mixture."""
-    symbols = set()
-    for atoms, _, _, _ in resolved:
-        symbols.update(atoms.get_chemical_symbols())
-    return max(vdw_radius(s) for s in symbols)
-
-
 def apportion(weights: list[float], total: int) -> list[int]:
     """Distribute ``total`` integer units across ``weights`` (largest remainder).
 

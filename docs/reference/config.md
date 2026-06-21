@@ -162,7 +162,7 @@ Packmol binary (`pixi install -e science`).
 | `file` | `str \| null` | `null` | Single guest: path to a structure file |
 | `species` | `list[Species]` | `[]` | A *mixture* of guests (alternative to the single-guest fields) |
 | `n_molecules` | `int` | `4` | Single mode: copies; ratio mixture: total guests |
-| `radial_margin` | `float` | `0.0` | *Extra* wall gap beyond van der Waals contact (Å) |
+| `radial_margin` | `float` | `0.0` | Extra room taken off the packing cylinder (Å) |
 | `axial_margin` | `float` | `1.5` | Inset at each tube end (Å; avoids PBC clashes) |
 | `tolerance` | `float` | `2.0` | Packmol minimum separation (Å) |
 | `pbc` | `bool` | `true` | Periodic along the tube axis |
@@ -171,12 +171,13 @@ Packmol binary (`pixi install -e science`).
 Use **either** a single guest (`molecule_name`/`smiles`/`file`) **or** a
 `species` mixture — not both.
 
-**No wall overlap.** The packing cylinder is sized from van der Waals radii so a
-guest atom can never sit inside the carbon wall, and the tube is additionally
-handed to Packmol as a *fixed obstacle* (so every guest atom is also kept at
-least `tolerance` from the wall). If the tube is too narrow/short to hold the
-guests without overlap the builder raises a clear error — widen (`n`/`m`),
-lengthen (`length`), use smaller guests, or reduce the margins.
+**No wall overlap.** The tube is handed to Packmol as a *fixed obstacle*, so
+every guest atom is kept at least `tolerance` from the wall in true 3D — that is
+what prevents overlap. The packing cylinder is only sized to keep guest atom
+centres inside the carbon van der Waals shell, leaving the full cavity usable
+(raise `tolerance` for more breathing room, or set `radial_margin` for extra).
+If the tube is too narrow/short the builder raises a clear error — widen
+(`n`/`m`), lengthen (`length`), or reduce the margins.
 
 ### `type = "molecule"`
 
