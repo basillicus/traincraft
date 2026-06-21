@@ -117,6 +117,44 @@ class NanotubeBuilder(TCModel):
     vacuum: float = 6.0
 
 
+class FilledNanotubeBuilder(TCModel):
+    """A carbon nanotube randomly filled with N molecules (the original
+    "fillMyTubes" use case). Packmol packs the guests inside a coaxial cylinder
+    just narrower than the tube; the tube is tagged framework (``tc_fragment ==
+    -1``) and each guest molecule is its own fragment, so MC/constraints can
+    address them. Periodic along the tube (z) axis by default.
+    """
+
+    type: Literal["filled_nanotube"] = "filled_nanotube"
+    # tube (same geometry as the bare `nanotube` builder; default is roomy armchair)
+    n: int = 10
+    m: int = 10
+    length: int = 6
+    bond: float = 1.42
+    vacuum: float = 8.0
+    # guest species: exactly one of molecule_name | smiles | file
+    molecule_name: str | None = None  # ase.build.molecule g2 name (e.g. "H2O")
+    smiles: str | None = None
+    file: FsPath | None = None
+    n_molecules: int = 4
+    # packing geometry
+    radial_margin: float = 1.8  # Å gap between guests and the tube wall (≈ vdW)
+    axial_margin: float = 1.5  # Å inset at each tube end (avoids PBC clashes along z)
+    tolerance: float = 2.0  # Packmol min separation
+    pbc: bool = True  # periodic along the tube axis
+    seed: int | None = None
+
+    @model_validator(mode="after")
+    def _one_guest(self) -> FilledNanotubeBuilder:
+        if sum(x is not None for x in (self.molecule_name, self.smiles, self.file)) != 1:
+            raise ValueError(
+                "filled_nanotube needs exactly one of 'molecule_name', 'smiles', or 'file'"
+            )
+        if self.n_molecules < 1:
+            raise ValueError("filled_nanotube needs n_molecules >= 1")
+        return self
+
+
 class MoleculeBuilder(TCModel):
     type: Literal["molecule"] = "molecule"
     name: str | None = None  # ASE g2 name (e.g. "CO2")
@@ -302,6 +340,7 @@ class IntercalationBuilder(TCModel):
 
 BuilderConfig = Annotated[
     NanotubeBuilder
+    | FilledNanotubeBuilder
     | MoleculeBuilder
     | SurfaceAdsorbateBuilder
     | SurfacePackingBuilder

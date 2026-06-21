@@ -11,7 +11,7 @@ a sequence of transforms.
 | | Source | Builder |
 |---|---|---|
 | **Starting point** | An existing structure | Constructs from scratch |
-| **Examples** | `file`, `scratch`, `smiles`, `url`, `materials_project`, `optimade`, `pubchem` | `crystal`, `slab`, `layered`, `nanotube`, `liquid`, `intercalation` |
+| **Examples** | `file`, `scratch`, `smiles`, `url`, `materials_project`, `optimade`, `pubchem` | `crystal`, `slab`, `layered`, `nanotube`, `filled_nanotube`, `liquid`, `intercalation` |
 | **TOML key** | `[geometry.source]` | `[geometry.builder]` |
 | **Use when** | You have a geometry already | You want to generate one |
 
@@ -93,7 +93,8 @@ name = "caffeine"          # or: cid = 2519 / smiles = "..."
 
 | Builder | System | Key parameters |
 |---|---|---|
-| `nanotube` | Carbon nanotube | `n`, `m`, `length`, `bond` |
+| `nanotube` | Carbon nanotube (empty) | `n`, `m`, `length`, `bond` |
+| `filled_nanotube` | CNT filled with molecules ("fillMyTubes") | `n`, `m`, `length`, `molecule_name`/`smiles`/`file`, `n_molecules`, Packmol |
 | `molecule` | ASE g2 molecule | `name` or `smiles` |
 | `crystal` | Bulk crystal | `name`, `crystalstructure`, `a`, `supercell`, `defects` |
 | `slab` | Crystalline slab | `element`, `facet` or `miller`, `size`, `layers` |

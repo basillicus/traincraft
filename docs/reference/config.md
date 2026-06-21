@@ -110,6 +110,35 @@ Requires RDKit (`pixi install -e science`).
 | `bond` | `float` | `1.42` | C–C bond length in Å |
 | `vacuum` | `float` | `6.0` | Radial vacuum in Å |
 
+### `type = "filled_nanotube"`
+
+A carbon nanotube **randomly filled with molecules** (the original "fillMyTubes"
+use case). Packmol packs `n_molecules` guests into a cylinder coaxial with the
+tube and just narrower than its wall. The tube carbons are tagged framework
+(`tc_fragment == -1`); each guest molecule is its own fragment. Requires the
+Packmol binary (`pixi install -e science`).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `n` | `int` | `10` | Chiral index n (default is roomy armchair) |
+| `m` | `int` | `10` | Chiral index m |
+| `length` | `int` | `6` | Unit cells along the tube axis |
+| `bond` | `float` | `1.42` | C–C bond length in Å |
+| `vacuum` | `float` | `8.0` | Radial vacuum in Å |
+| `molecule_name` | `str \| null` | `null` | ASE g2 guest name (e.g. `"H2O"`) |
+| `smiles` | `str \| null` | `null` | SMILES guest (needs RDKit) |
+| `file` | `str \| null` | `null` | Path to a guest structure file |
+| `n_molecules` | `int` | `4` | Number of guests to pack inside |
+| `radial_margin` | `float` | `1.8` | Gap between guests and the tube wall (Å) |
+| `axial_margin` | `float` | `1.5` | Inset at each tube end (Å; avoids PBC clashes) |
+| `tolerance` | `float` | `2.0` | Packmol minimum separation (Å) |
+| `pbc` | `bool` | `true` | Periodic along the tube axis |
+| `seed` | `int \| null` | `null` | Packmol seed |
+
+Exactly one of `molecule_name`, `smiles`, or `file` must be set. The builder
+raises if the tube is too narrow/short to hold the requested guests — widen
+(`n`/`m`), lengthen (`length`), or reduce the margins.
+
 ### `type = "molecule"`
 
 | Field | Type | Default | Description |
