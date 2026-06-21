@@ -25,6 +25,7 @@ from .labeling import label_frames
 from .orchestration import run_pipeline
 from .sampling import run_sampling
 from .selection import run_funnel
+from .training import run_training
 
 __version__ = "0.1.0"
 
@@ -48,5 +49,6 @@ __all__ = [
     "run_funnel",
     "run_pipeline",
     "run_sampling",
+    "run_training",
     "write_frames",
 ]

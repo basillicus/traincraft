@@ -13,9 +13,12 @@ only spends expensive DFT on structures that actually improve the model.
 
 ## 📚 Documentation
 
+**📖 Hosted docs: <https://basillicus.github.io/traincraft/>** (built and deployed
+from `main` by GitHub Actions).
+
 The `docs/` folder is a **MkDocs (Material)** site — reading the raw `.md` files
 directly misses the navigation, cross-links, and auto-generated API reference, so
-read it as a rendered site instead:
+read it as the rendered site above, or serve it locally:
 
 ```bash
 pixi install -e docs      # one-time: MkDocs + Material + mkdocstrings
@@ -50,7 +53,7 @@ Good entry points once the site is up:
 **With pixi (recommended — mixes conda-forge and PyPI in one lockfile):**
 
 ```bash
-git clone <repo> && cd traincraft
+git clone https://github.com/basillicus/traincraft && cd traincraft
 
 pixi install           # default env: core deps only (ASE, pydantic, typer)
 pixi install -e dev    # + pytest, ruff, mypy

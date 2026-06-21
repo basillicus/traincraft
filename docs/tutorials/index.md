@@ -22,6 +22,7 @@ graph LR
     T7["7 · MACE-MP0<br/>(foundation model)"]
     T8["8 · Selection Funnel<br/>(diversity, budget)"]
     T9["9 · Interop<br/>(pymatgen, RDKit)"]
+    T10["10 · Training<br/>(fine-tune MACE)"]
 
     T1 --> T2
     T1 --> T4
@@ -31,6 +32,8 @@ graph LR
     T1 --> T7
     T1 --> T8
     T3 --> T9
+    T7 --> T10
+    T8 --> T10
 ```
 
 ---
@@ -48,3 +51,4 @@ graph LR
 | [7 · MACE-MP0](07-mace-mp0.md) | Any periodic system | torch, mace-torch | `mace` |
 | [8 · Selection Funnel](08-selection-funnel.md) | Any | None | `default` |
 | [9 · Interop](09-interop.md) | Any | pymatgen, RDKit | `science` |
+| [10 · Training](10-training.md) | Fine-tune MACE on a dataset | torch, mace-torch | `mace` |

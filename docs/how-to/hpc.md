@@ -5,8 +5,8 @@ jobs, each running in an Apptainer image. Nothing here is specific to one machin
 the account, partitions, modules, image paths, and bind mounts are all config.
 CINECA Leonardo appears only as a worked example at the end.
 
-> Architecture and rationale: [`DESIGN.md` §20](https://github.com/your-org/traincraft/blob/main/DESIGN.md).
-> Definition files and build notes: [`containers/`](https://github.com/your-org/traincraft/tree/main/containers).
+> Architecture and rationale: [`DESIGN.md` §20](https://github.com/basillicus/traincraft/blob/main/DESIGN.md).
+> Definition files and build notes: [`containers/`](https://github.com/basillicus/traincraft/tree/main/containers).
 
 ## The images
 
@@ -134,7 +134,7 @@ stage …` directly — put the needed `module load` / `source activate` lines i
 
 Leonardo has a GPU **Booster** (A100) and a CPU **DCGP** partition, and
 `srun --mpi=list` shows `pmix`. So: our images, PMIx launch. Full file:
-[`examples/19_hpc_leonardo_label.toml`](https://github.com/your-org/traincraft/blob/main/examples/19_hpc_leonardo_label.toml).
+[`examples/19_hpc_leonardo_label.toml`](https://github.com/basillicus/traincraft/blob/main/examples/19_hpc_leonardo_label.toml).
 
 ```toml
 [orchestration.slurm]
@@ -164,7 +164,7 @@ link line) when building the FHI-aims image.
 LUMI is a Cray EX: Slingshot interconnect, and `srun --mpi=list` shows **no
 pmix** (only `cray_shasta` / `pmi2`). The clean path is `runtime = "native"` using
 the site's `cray-mpich` and FHI-aims/QE modules. Full file:
-[`examples/20_hpc_lumi_native.toml`](https://github.com/your-org/traincraft/blob/main/examples/20_hpc_lumi_native.toml).
+[`examples/20_hpc_lumi_native.toml`](https://github.com/basillicus/traincraft/blob/main/examples/20_hpc_lumi_native.toml).
 
 ```toml
 [orchestration.slurm]

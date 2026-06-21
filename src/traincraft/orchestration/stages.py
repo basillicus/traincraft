@@ -12,6 +12,7 @@ Artifacts (under the run workspace):
     select   -> selected/selected.extxyz
     label    -> labeled_dft/labeled.extxyz  (+ manifest.json, frame_*/)
     dataset  -> <dataset.path>/ (a Dataset)
+    train    -> model/ (mace_run_train: <name>.model + manifest.json)
 """
 
 from __future__ import annotations
@@ -29,11 +30,13 @@ from ..geometry import build_geometry
 from ..labeling import label_frames
 from ..sampling import run_sampling
 from ..selection import run_funnel
+from ..training import run_training
 
 logger = logging.getLogger(__name__)
 
-# Stages that produce a frames artifact, in pipeline order (dataset is terminal).
-STAGE_ORDER = ("geometry", "sample", "select", "label", "dataset")
+# Stages in pipeline order. dataset is terminal for frames; train consumes the
+# dataset (or labelled frames) and emits a model rather than a frames artifact.
+STAGE_ORDER = ("geometry", "sample", "select", "label", "dataset", "train")
 _PRODUCERS = ("geometry", "sample", "select", "label")
 _ARTIFACT = {
     "geometry": ("structures", "initial.extxyz"),
@@ -55,6 +58,7 @@ def enabled_stages(config: TrainCraftConfig) -> list[str]:
         ("select", config.selection),
         ("label", config.labeling),
         ("dataset", config.dataset),
+        ("train", config.training),
     ):
         if section is not None:
             stages.append(name)
@@ -148,12 +152,39 @@ def stage_dataset(config, ws, force=False):
     return frames
 
 
+def stage_train(config, ws, force=False):
+    if config.training is None:
+        return _latest_upstream(ws, "train")
+    job = ws.job("model")
+    manifest = job.dir / "manifest.json"
+    if manifest.exists() and not force:
+        logger.info("train: using cached %s", manifest)
+        return _training_frames(config, ws)
+    frames = _training_frames(config, ws)
+    result = run_training(frames, config.training, job)
+    logger.info(
+        "trained '%s' on %d frames (model: %s)",
+        config.training.name, result.n_train, result.model_path,
+    )
+    return frames
+
+
+def _training_frames(config, ws) -> list:
+    """Frames to train on: the dataset artifact if built, else the latest upstream."""
+    if config.dataset is not None:
+        ds_path = Dataset(ws.root / config.dataset.path).path
+        if ds_path.exists():
+            return read_frames(ds_path)
+    return _latest_upstream(ws, "train")
+
+
 _DISPATCH = {
     "geometry": stage_geometry,
     "sample": stage_sample,
     "select": stage_select,
     "label": stage_label,
     "dataset": stage_dataset,
+    "train": stage_train,
 }
 
 

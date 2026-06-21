@@ -145,6 +145,9 @@ The result is a set of diverse, physically valid frames ready to be labeled with
   example, explaining every config option in detail.
 - **[Tutorial 3](../tutorials/03-surfaces.md)** — molecules on surfaces with Monte
   Carlo sampling (more scientifically interesting for most use cases).
+- **[Tutorial 10](../tutorials/10-training.md)** — once you have a labeled dataset,
+  *train a MACE model* on it: add a `[training]` section and `traincraft run` does
+  the rest.
 - **[Config Schema](../reference/config.md)** — the complete reference for every
   TOML field.
 

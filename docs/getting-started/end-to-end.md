@@ -32,7 +32,7 @@ called out explicitly.
 ## 1. Install
 
 ```bash
-git clone https://github.com/your-org/traincraft.git
+git clone https://github.com/basillicus/traincraft.git
 cd traincraft
 
 # install pixi if you don't have it
@@ -305,6 +305,51 @@ ls $WORK/runs/<run-name>/
 #   labeled_dft/manifest.json      -> level of theory, properties, counts
 ```
 
-`dataset.extxyz` is ready for MACE training (Phase 3). You have gone from an
-empty checkout to a DFT-labeled dataset produced on an HPC cluster — exploring
-cheaply, labeling selectively, with every frame's provenance recorded.
+`dataset.extxyz` is your DFT-labeled training set. You have gone from an empty
+checkout to a labeled dataset produced on an HPC cluster — exploring cheaply,
+labeling selectively, with every frame's provenance recorded.
+
+---
+
+## 11. Train a MACE model on it
+
+Add a `[training]` section and the same `traincraft` driver fine-tunes a MACE
+foundation model on the dataset — locally, or as a GPU Slurm step on the cluster:
+
+```toml
+[training]
+type             = "mace"
+name             = "my_model"
+foundation_model = "medium"          # fine-tune the medium MACE-MP foundation
+strategy         = "multihead"       # replay against catastrophic forgetting
+heads            = ["energy", "forces", "stress"]
+e0s              = "foundation"
+pt_train_file    = "mp"
+device           = "cuda"
+```
+
+Locally (needs the `mace` env):
+
+```bash
+pixi run -e mace traincraft stage train my_workflow.toml
+ls runs/<run-name>/model/      # my_model.model  manifest.json  results/  logs/
+```
+
+On the cluster, `train` is just another stage — `traincraft submit` renders it as
+a GPU (`--nv`) job in `traincraft-mlip.sif`, chained after `dataset`:
+
+```bash
+apptainer exec $WORK/sif/traincraft-core.sif \
+  traincraft submit $WORK/runs/my_workflow.toml --dry-run
+cat $WORK/runs/<run-name>/slurm/train.sbatch     # a --nv GPU step
+```
+
+The result is a trained `.model` you can feed back in as the exploration engine
+for the next active-learning iteration. The full picture — strategies, the
+multi-head dipole/polarizability heads for IR & Raman, and the research-backed
+defaults — is in [Tutorial 10 · Training](../tutorials/10-training.md) and the
+[Training concept page](../concepts/training.md).
+
+You've now gone end to end: from an empty checkout to a DFT-labeled dataset *and*
+a trained MACE potential, with the same config driving a laptop or a
+supercomputer.

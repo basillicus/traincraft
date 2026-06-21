@@ -84,7 +84,10 @@ def validate(config: Path = typer.Argument(..., exists=True, readable=True)) -> 
     cfg = load_config(config)
     stages = [
         name
-        for name in ("geometry", "calculator", "sampling", "selection", "labeling", "dataset")
+        for name in (
+            "geometry", "calculator", "sampling", "selection",
+            "labeling", "dataset", "training",
+        )
         if getattr(cfg, name) is not None
     ]
     typer.echo("OK: config is valid")
@@ -105,7 +108,9 @@ def new(path: Path = typer.Argument(...)) -> None:
 @app.command()
 def plugins() -> None:
     """List registered plugins by kind."""
-    for kind in ("source", "builder", "transform", "calculator", "sampler", "selector"):
+    for kind in (
+        "source", "builder", "transform", "calculator", "sampler", "selector", "trainer",
+    ):
         typer.echo(f"{kind}: {', '.join(available(kind)) or '(none)'}")
 
 

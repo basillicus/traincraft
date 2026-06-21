@@ -217,7 +217,7 @@ print(len(primitive))                     # 2 atoms
 | ASE → RDKit | `ase_to_rdkit` | Non-periodic only; bonds perceived by xyz2mol |
 | RDKit → ASE | `rdkit_to_ase` | Uses `conf_id` to select conformer |
 
-**You've completed all the tutorials!** Check out the
-[Concepts](../concepts/architecture.md) section for a deeper understanding
-of how TrainCraft works under the hood, or jump straight to the
+**Next:** [Tutorial 10](10-training.md) — train a MACE model on the dataset you've
+built. Or check out the [Concepts](../concepts/architecture.md) section for a
+deeper understanding of how TrainCraft works under the hood, or the
 [Config Schema](../reference/config.md) for the complete field reference.

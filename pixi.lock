@@ -5087,7 +5087,7 @@ packages:
 - pypi: ./
   name: traincraft
   version: 0.1.0
-  sha256: 63d5226156e8e20123d9d005b043e793185ed63313b713bc888a53ef8237e391
+  sha256: ee1da7865dd3b89e2e668e8fbcdfc9f1eae12d9843f06a6499a3e4abb3887daa
   requires_dist:
   - ase>=3.22
   - numpy>=1.23
@@ -5107,6 +5107,8 @@ packages:
   - pytest>=7 ; extra == 'dev'
   - ruff>=0.5 ; extra == 'dev'
   - mypy>=1.8 ; extra == 'dev'
+  - mkdocs-material>=9.5 ; extra == 'docs'
+  - mkdocstrings[python]>=0.25 ; extra == 'docs'
   requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/a9/aa/714334aac6e3fe8c4c5382fe7fc9cba9a9727e05b7eb7e37edcee7d11ca4/trainstation-1.2-py3-none-any.whl
   name: trainstation

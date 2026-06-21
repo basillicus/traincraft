@@ -2,8 +2,8 @@ site_name: TrainCraft
 site_description: >-
   Modular MLIP dataset generation and active learning — build training data
   for MACE and other machine-learned interatomic potentials.
-site_url: https://traincraft.readthedocs.io
-repo_url: https://github.com/your-org/traincraft
+site_url: https://basillicus.github.io/traincraft/
+repo_url: https://github.com/basillicus/traincraft
 repo_name: traincraft
 docs_dir: docs
 
@@ -110,11 +110,13 @@ nav:
     - "7 · MACE-MP0 Sampling": tutorials/07-mace-mp0.md
     - "8 · The Selection Funnel": tutorials/08-selection-funnel.md
     - "9 · ASE · pymatgen · RDKit": tutorials/09-interop.md
+    - "10 · Training a MACE Model": tutorials/10-training.md
   - Concepts:
     - concepts/index.md
     - Architecture: concepts/architecture.md
     - Geometry System: concepts/geometry.md
     - Calculators & DFT Labeling: concepts/calculators.md
+    - Training (multi-head MACE): concepts/training.md
     - Fragment Identity: concepts/fragments.md
     - Provenance: concepts/provenance.md
     - Selection Funnel: concepts/selection.md
@@ -122,7 +124,7 @@ nav:
     - how-to/index.md
     - Write a Custom Builder: how-to/custom-builder.md
     - Write a Custom Sampler: how-to/custom-sampler.md
-    - Use Your Own MACE Model: how-to/own-mace-model.md
+    - Train & Use Your Own MACE Model: how-to/own-mace-model.md
     - Manage Datasets: how-to/datasets.md
     - Run on HPC (Slurm + Apptainer): how-to/hpc.md
   - Reference:
@@ -135,7 +137,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-org/traincraft
+      link: https://github.com/basillicus/traincraft
 
 extra_css:
   - stylesheets/extra.css

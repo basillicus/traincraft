@@ -174,20 +174,53 @@ Acceptance
 
 ---
 
-## Phase 3 — Training + validation (multi-head MACE)
+## Phase 3 — Training + validation (multi-head MACE)  *(in progress)*
 
-**Goal:** train MACE on all properties and measure quality end-to-end.
+**Goal:** train MACE on all properties and measure quality end-to-end. Delivered
+in chunks (training first — validation builds on it — then health, then validation).
 
-Deliverables
-- `training/` — MACE fine-tune/train wrapper (`mace_run_train --foundation_model`),
-  explicit multi-head config (energy/forces + optional dipole + polarizability),
-  checkpoints, metrics. Pluggable model interface for future backends.
-- `datasets/` health tooling: composition/space/volume coverage maps; energy and
-  per-element force distributions with outlier flags; extrapolation grade;
-  redundancy report.
-- `validation/` — per-property parity + RMSE/MAE (per element), learning curves,
-  NVE/MD stability, EOS/phonons, **IR and Raman spectra reconstruction** from
-  MLIP-driven MD vs DFT/experiment.
+### ✅ Chunk 1 — Training (`training/`)  *(done)*
+
+- `training/base.py` — `trainer` registry kind + `run_training`; `write_training_xyz`
+  re-keys TrainCraft `tc_*` properties onto explicit MACE reference keys
+  (`REF_energy`/`REF_forces`/`REF_stress`/`REF_dipole`/`REF_polarizability`) so
+  labels are never silently dropped.
+- `training/mace.py` — MACE backend: deterministic train/valid split, renders the
+  full `mace_run_train` command, shells out, locates the `.model`, writes a
+  `manifest.json`. **Container-agnostic**: the command is injected from
+  `TRAINCRAFT_MACE_TRAIN_COMMAND` (DESIGN §20.3), defaulting to the bare console
+  script; no torch import in `core`.
+- **Multi-head mapping** from the requested `heads` to MACE model + loss:
+  dipole → `AtomicDipolesMACE`/`EnergyDipolesMACE` (`dipole`/`energy_forces_dipole`),
+  polarizability → `AtomicDielectricMACE` (`dipole_polar`). The dielectric model
+  types track MACE-MDP / `mace-field`; `[training.extra]` overrides `--model`/`--loss`
+  for version drift (the same gating philosophy as QE `ph.x` polarizability).
+- **Fine-tuning defaults** follow Tompa, Varga-Umbrich, Batatia, Elena, Bernstein &
+  Csányi, *"Fine-tuning MLIP foundation models"* (arXiv:2606.12704): `e0s="foundation"`
+  (averaging is 2–3× worse), `strategy="multihead"` replay against catastrophic
+  forgetting, `weight_decay=0`, `ema_decay=0.995`, constant λ_E = λ_F = 10.
+- `train` stage (`stages.py` + `local.py`): consumes the dataset (or labelled
+  frames) → `runs/<name>/model/`. Slurm executor maps it to a GPU (`--nv`)
+  `traincraft-mlip.sif` step (DESIGN §20.6). `examples/21`.
+
+Acceptance (met)
+- ✅ `train` renders a correct `mace_run_train` invocation (flags, reference keys,
+  multi-head model/loss mapping, paper-informed defaults, command injection,
+  `extra` passthrough) and runs it as a stage; covered by `test_training` (subprocess
+  mocked — MACE training is GPU/hours, not a CI op), mirroring `test_dft`/`test_slurm_executor`.
+- 🔜 A real fine-tune on a seed set inside `traincraft-mlip.sif` produces a usable
+  `.model` (verified on a GPU node).
+
+### 🔜 Chunk 2 — Dataset health tooling (`datasets/`)
+
+Composition/space/volume coverage maps; energy and per-element force distributions
+with outlier flags; extrapolation grade; redundancy report.
+
+### 🔜 Chunk 3 — Validation (`validation/`)
+
+Per-property parity + RMSE/MAE (per element), learning curves, NVE/MD stability,
+EOS/phonons, **IR and Raman spectra reconstruction** from MLIP-driven MD vs
+DFT/experiment.
 
 Acceptance
 - A fine-tuned model trains on a seed set and produces a quality report covering

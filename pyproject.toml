@@ -27,6 +27,7 @@ descriptors = ["dscribe"]
 sampling    = ["hiphive"]
 semiempirical = ["tblite"]
 dev         = ["pytest>=7", "ruff>=0.5", "mypy>=1.8"]
+docs        = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.25"]
 
 [project.scripts]
 traincraft = "traincraft.cli:app"
@@ -148,8 +149,13 @@ example-15 = { cmd = "traincraft run examples/15_h_graphite_intercalation.toml",
 example-16 = { cmd = "traincraft run examples/16_slab_constraints_md.toml", description = "Cu(111) slab + frozen bottom layer (constraints) + MD (no extra deps)" }
 example-17 = { cmd = "traincraft run examples/17_water_box_liquid.toml", description = "Packmol water box (liquid builder) + xTB MD (needs science env)" }
 example-18 = { cmd = "traincraft run examples/18_label_after_select.toml", description = "Build->sample->select->LABEL (DFT labeling stage; EMT stand-in, no extra deps)" }
-docs-serve = { cmd = "mkdocs serve",          description = "Serve docs locally with live reload (needs docs env)" }
-docs-build = { cmd = "mkdocs build --strict", description = "Build docs to site/ (needs docs env)" }
+example-21 = { cmd = "traincraft run examples/21_train_mace_finetune.toml", description = "Build->...->dataset->TRAIN a MACE foundation model (needs mace env)" }
+
+# Docs tasks live on the `docs` feature so they only exist in the `docs`
+# environment — `pixi run docs-serve` then auto-selects that env (no `-e docs`).
+[tool.pixi.feature.docs.tasks]
+docs-serve = { cmd = "mkdocs serve",          description = "Serve docs locally with live reload" }
+docs-build = { cmd = "mkdocs build --strict", description = "Build docs to site/" }
 
 # ---------------------------------------------------------------------------
 # Tooling config

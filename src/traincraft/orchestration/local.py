@@ -19,6 +19,7 @@ from .stages import (
     stage_label,
     stage_sample,
     stage_select,
+    stage_train,
     workspace_for,
 )
 
@@ -38,10 +39,12 @@ def run_pipeline(config: TrainCraftConfig) -> dict:
     selected = stage_select(config, ws)
     labeled = stage_label(config, ws)
     stage_dataset(config, ws)
+    stage_train(config, ws)
 
     dataset_path = None
     if config.dataset is not None:
         dataset_path = str(Dataset(ws.root / config.dataset.path).path)
+    model_dir = str(ws.root / "model") if config.training is not None else None
 
     return {
         "workspace": str(ws.root),
@@ -49,4 +52,5 @@ def run_pipeline(config: TrainCraftConfig) -> dict:
         "n_selected": len(selected),
         "n_labeled": len(labeled) if config.labeling is not None else 0,
         "dataset": dataset_path,
+        "model": model_dir,
     }

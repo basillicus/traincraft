@@ -83,7 +83,7 @@ Label selected frames with energy, forces, stress, dipole, and polarizability.
 
 Run the real workflow on **any Slurm cluster** via **Apptainer** (or the cluster's
 own binaries). Nothing is site-specific in the code. See
-[`DESIGN.md` §20](https://github.com/your-org/traincraft/blob/main/DESIGN.md) and
+[`DESIGN.md` §20](https://github.com/basillicus/traincraft/blob/main/DESIGN.md) and
 the [Run on HPC (Slurm + Apptainer)](how-to/hpc.md) guide.
 
 - ✅ Architecture + four Apptainer `*.def` files (`containers/`): `traincraft-core`
@@ -100,15 +100,31 @@ the [Run on HPC (Slurm + Apptainer)](how-to/hpc.md) guide.
 
 ---
 
-## 🔜 Phase 3 — Training + Validation
+## Phase 3 — Training + Validation *(in progress)*
 
-Train a multi-head MACE model and measure quality end-to-end.
+Train a multi-head MACE model and measure quality end-to-end. Delivered in
+chunks: training first (validation builds on it), then dataset health, then
+validation.
 
-- MACE fine-tune/train wrapper (`mace_run_train --foundation_model`)
-- Multi-head config: energy/forces + optional dipole + polarizability
-- Dataset health tooling: composition/space/volume coverage, force distributions
-- Validation: parity plots, RMSE/MAE per element, NVE stability, EOS/phonons
-- **IR and Raman spectra** reconstructed from MLIP-driven MD vs DFT/experiment
+**✅ Chunk 1 — Training (`training/`).** MACE fine-tune / train-from-scratch
+wrapper over `mace_run_train`, as a pluggable `trainer` registry backend.
+Multi-head property targets (energy/forces/stress + dipole + polarizability) map
+onto MACE's model types and losses (`AtomicDipolesMACE` / `EnergyDipolesMACE` /
+`AtomicDielectricMACE`). The `train` stage consumes the dataset and emits a model
+tree (`model/<name>.model` + manifest); on HPC it runs as a GPU (`--nv`) step in
+`traincraft-mlip.sif` with the command injected from the environment. Fine-tuning
+defaults follow [Tompa et al. (arXiv:2606.12704)](https://arxiv.org/abs/2606.12704):
+foundation-consistent E0s, multihead replay against forgetting, `weight_decay=0`,
+high EMA, constant energy-prioritised loss weights. See
+[Training](concepts/training.md); `examples/21`.
+
+**🔜 Chunk 2 — Dataset health tooling (`datasets/`).** Composition/space/volume
+coverage maps, per-element force distributions with outlier flags, extrapolation
+grade, redundancy report.
+
+**🔜 Chunk 3 — Validation (`validation/`).** Per-property parity + RMSE/MAE per
+element, learning curves, NVE/MD stability, EOS/phonons, and **IR/Raman spectra**
+reconstructed from MLIP-driven MD vs DFT/experiment.
 
 ---
 

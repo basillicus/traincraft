@@ -26,8 +26,13 @@ traincraft run CONFIG
 
 1. Loads and validates `CONFIG` via pydantic.
 2. Creates the workspace directory (`runs/<name>/`).
-3. Runs each active stage in order: geometry → sampling → selection → dataset.
+3. Runs each active stage in order: geometry → sampling → selection → labeling →
+   dataset → training (only the sections you declared run).
 4. Prints a summary to stdout.
+
+!!! note "Slurm routing"
+    If `[orchestration].engine = "slurm"`, `run` instead renders and submits the
+    stages as dependency-chained Slurm jobs (see [`submit`](#traincraft-submit)).
 
 **Example:**
 
@@ -49,6 +54,57 @@ Done:
     Each run writes to a named workspace. Running the same config twice writes
     to the same workspace and **appends** to the dataset (deduplicating by hash).
     Nothing is ever overwritten.
+
+---
+
+## `traincraft stage`
+
+Run a **single** pipeline stage standalone, reading the previous stage's artifact
+from the workspace and writing its own. This is what the HPC executor dispatches
+as separate jobs — and it's how you train on an existing dataset.
+
+```bash
+traincraft stage NAME CONFIG [--force]
+```
+
+**Arguments / options:**
+
+| Argument | Description |
+|---|---|
+| `NAME` | One of: `geometry`, `sample`, `select`, `label`, `dataset`, `train` |
+| `CONFIG` | Path to a `.toml` file |
+| `--force` | Recompute even if the stage's artifact already exists |
+
+**Example — train on a dataset you already built:**
+
+```bash
+pixi run -e mace traincraft stage train my_run.toml
+```
+
+```
+stage 'train': 42 frames
+```
+
+The `train` stage writes `runs/<name>/model/<name>.model` and a `manifest.json`.
+See [Tutorial 10 · Training](../tutorials/10-training.md).
+
+---
+
+## `traincraft submit`
+
+Render (and, unless `--dry-run`, submit) the workflow as dependency-chained
+Slurm jobs via Apptainer. Requires an `[orchestration.slurm]` section.
+
+```bash
+traincraft submit CONFIG [--dry-run]
+```
+
+| Option | Description |
+|---|---|
+| `--dry-run` | Write the sbatch scripts but don't submit |
+
+The GPU stages (`sample`, `train`) run in `traincraft-mlip.sif` with `--nv`; the
+DFT `label` stage injects the engine command. See [Run on HPC](../how-to/hpc.md).
 
 ---
 
@@ -132,12 +188,13 @@ traincraft plugins
 **Output:**
 
 ```
-source:    file, scratch, smiles, url
-builder:   crystal, layered, molecule, nanotube, slab, surface_adsorbate, surface_packing
-transform: perturb, rotate, set_pbc, strain, supercell, vacuum
-calculator: emt, mace, tblite, xtb
+source:    file, materials_project, optimade, pubchem, scratch, smiles, url
+builder:   crystal, intercalation, layered, liquid, molecule, nanotube, slab, surface_adsorbate, surface_packing
+transform: constraints, perturb, rotate, set_pbc, strain, supercell, vacuum
+calculator: emt, fhi_aims, mace, qe, tblite, xtb
 sampler:   md, monte_carlo, rattle
 selector:  dedup, diversity, physicality
+trainer:   mace
 ```
 
 !!! note "Plugin availability depends on your environment"

@@ -523,6 +523,108 @@ class DatasetConfig(TCModel):
     format: Literal["extxyz"] = "extxyz"
 
 
+# --------------------------------------------------------------------------- training
+# Properties a MACE model can be trained to predict. energy/forces are the core
+# task; stress on periodic data; dipole/polarizability are the IR/Raman heads
+# (DESIGN §6, §12). The head set selects the MACE model type + loss (see
+# training/mace.py): dipole -> AtomicDipolesMACE/EnergyDipolesMACE,
+# polarizability -> AtomicDielectricMACE.
+_HEAD = Literal["energy", "forces", "stress", "dipole", "polarizability"]
+
+
+class MaceTrainer(TCModel):
+    """MACE fine-tune / train-from-scratch wrapper (``mace_run_train``).
+
+    Defaults follow Tompa, Varga-Umbrich, Batatia, Elena, Bernstein & Csányi,
+    *"Fine-tuning MLIP foundation models: strategies for accuracy and
+    transferability"* (arXiv:2606.12704): start from the strongest foundation,
+    keep E0s consistent with it (``e0s="foundation"`` — averaging is 2–3× worse),
+    use **multihead replay** to avoid catastrophic forgetting, and for fine-tuning
+    set ``weight_decay=0`` with a high EMA decay and constant, energy-prioritised
+    loss weights (λ_E = λ_F = 10). See ``training/mace.py`` and the docs.
+
+    The run command is injected from the environment
+    (``TRAINCRAFT_MACE_TRAIN_COMMAND``, default ``mace_run_train``) so the trainer
+    stays container-agnostic (DESIGN §20.3): an HPC executor points it at
+    ``srun --nv apptainer exec … traincraft-mlip.sif mace_run_train``.
+    """
+
+    type: Literal["mace"] = "mace"
+    name: str = "mace_model"
+
+    # --- foundation / strategy --------------------------------------------
+    # Foundation model: a name MACE understands ("small"/"medium"/"large",
+    # "mace-mp0", "mace-off23", "mace-mdp", "mace-polar") or a path to a .model.
+    # None trains from scratch.
+    foundation_model: str | None = "medium"
+    strategy: Literal["naive", "multihead", "scratch"] = "multihead"
+    # heads the model learns; energy+forces are implied for any non-dipole-only set
+    heads: list[_HEAD] = Field(default_factory=lambda: ["energy", "forces"])
+
+    # --- isolated-atom reference energies (E0s) ---------------------------
+    # "foundation" reuses the foundation model's E0s (recommended; consistent
+    # level of theory), "average" estimates from the data (paper: avoid), or a
+    # JSON dict string like '{1: -13.6, 8: -2041.0}'.
+    e0s: str = "foundation"
+
+    # --- data split / replay ----------------------------------------------
+    valid_fraction: float = 0.1
+    # Replay (pretraining) data for multihead fine-tuning. "mp" downloads the
+    # Materials Project subset; a path uses your own. Required by MACE for
+    # multihead fine-tuning of a non-MP foundation.
+    pt_train_file: str | None = None
+    num_samples_pt: int = 30000  # paper/MACE-recommended replay sample count
+    weight_pt: float = 1.0  # replay-head weight (paper: λ_E^replay = 1)
+    weight_ft: float = 1.0  # fine-tune-head weight
+
+    # --- loss weights (paper: energy-prioritised, constant) ---------------
+    energy_weight: float = 10.0
+    forces_weight: float = 10.0
+    stress_weight: float = 1.0
+    dipole_weight: float = 1.0
+    polarizability_weight: float = 1.0
+
+    # --- optimisation (fine-tune defaults per the paper) ------------------
+    lr: float = 1e-3  # naive: 1e-3..1e-4; multihead converges best ~1e-4
+    weight_decay: float = 0.0  # essential 0 for fine-tuning (paper); raise for scratch
+    ema: bool = True
+    ema_decay: float = 0.995  # paper: > 0.99 for fine-tuning
+    max_num_epochs: int = 200
+    batch_size: int = 10
+    swa: bool = False
+
+    # --- model size (from-scratch only; foundation fixes these otherwise) -
+    hidden_irreps: str | None = None  # e.g. "128x0e + 128x1o"
+    r_max: float = 5.0
+
+    # --- runtime ----------------------------------------------------------
+    device: str = "cpu"  # "cuda" on a GPU node
+    default_dtype: Literal["float32", "float64"] = "float64"
+    seed: int | None = None
+
+    # arbitrary mace_run_train flags, passed through verbatim (wins over defaults).
+    # Keys are long-form names without the leading "--" (e.g. {"scheduler": "..."}).
+    extra: dict = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _check(self) -> MaceTrainer:
+        if not self.heads:
+            raise ValueError("training needs at least one head in 'heads'")
+        if not 0.0 < self.valid_fraction < 1.0:
+            raise ValueError("valid_fraction must be in (0, 1)")
+        if self.strategy != "scratch" and self.foundation_model is None:
+            raise ValueError(
+                f"strategy {self.strategy!r} needs a 'foundation_model' "
+                "(use strategy='scratch' to train from scratch)"
+            )
+        if self.strategy == "scratch" and self.foundation_model is not None:
+            raise ValueError("strategy='scratch' must not set a 'foundation_model'")
+        return self
+
+
+TrainingConfig = Annotated[MaceTrainer, Field(discriminator="type")]
+
+
 # --------------------------------------------------------------------- orchestration
 class SlurmStage(TCModel):
     """Per-stage Slurm/Apptainer overrides (merged onto built-in defaults)."""
@@ -589,4 +691,5 @@ class TrainCraftConfig(TCModel):
     selection: SelectionConfig | None = None
     labeling: LabelingConfig | None = None
     dataset: DatasetConfig | None = None
+    training: TrainingConfig | None = None
     orchestration: OrchestrationConfig | None = None

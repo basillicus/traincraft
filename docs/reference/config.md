@@ -321,3 +321,86 @@ Metropolis MC with rigid-body translate/rotate and optional conformer-swap moves
 |---|---|---|---|
 | `path` | `str` | `"dataset"` | Path (without extension) for the output extxyz dataset |
 | `format` | `"extxyz"` | `"extxyz"` | Output format (only extxyz is currently supported) |
+
+---
+
+## `[labeling]`
+
+Labels the **selected** frames with an (expensive) calculator — distinct from the
+cheap `[calculator]` that drives sampling. Presence of this section enables the
+`label` stage.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `calculator` | calculator config | required | A `[labeling.calculator]` sub-table; usually `fhi_aims` or `qe` (any calculator works — `emt` stands in for DFT in demos) |
+
+```toml
+[labeling.calculator]
+type             = "fhi_aims"
+xc               = "pbe"
+species_defaults = "tight"
+properties       = ["polarizability"]   # E/F/stress always; + dipole/polarizability on request
+```
+
+See [Calculators & DFT Labeling](../concepts/calculators.md) for the DFT
+calculator fields and the environment-injected run command.
+
+---
+
+## `[training]`
+
+Trains a MACE model on the dataset (or the labelled frames). Presence of this
+section enables the `train` stage, which runs after `dataset`. Defaults follow
+[Tompa et al. (arXiv:2606.12704)](https://arxiv.org/abs/2606.12704); see the
+[Training concept page](../concepts/training.md).
+
+### `type = "mace"`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | `str` | `"mace_model"` | Output model name → `model/<name>.model` |
+| `foundation_model` | `str \| null` | `"medium"` | Model to fine-tune from: `small`/`medium`/`large`, `mace-mp0`, `mace-off23`, or a path. `null` with `strategy="scratch"` trains from scratch |
+| `strategy` | `"multihead" \| "naive" \| "scratch"` | `"multihead"` | Fine-tuning recipe. `multihead` = replay against forgetting |
+| `heads` | `list[str]` | `["energy", "forces"]` | Properties to learn: any of `energy`, `forces`, `stress`, `dipole`, `polarizability`. Selects the MACE model type + loss |
+| `e0s` | `str` | `"foundation"` | Isolated-atom energies: `"foundation"` (reuse), `"average"` (avoid), or a JSON `Z→energy` dict |
+| `valid_fraction` | `float` | `0.1` | Held-out validation fraction (deterministic given `[run].seed`) |
+| `pt_train_file` | `str \| null` | `null` | Replay data for multihead fine-tuning: `"mp"` or a path |
+| `num_samples_pt` | `int` | `30000` | Number of replay samples |
+| `weight_pt`, `weight_ft` | `float` | `1.0`, `1.0` | Replay-head / fine-tune-head weights |
+| `energy_weight`, `forces_weight` | `float` | `10.0`, `10.0` | Loss weights (paper: energy-prioritised, constant) |
+| `stress_weight`, `dipole_weight`, `polarizability_weight` | `float` | `1.0` | Per-head loss weights (used when that head is present) |
+| `lr` | `float` | `1e-3` | Learning rate |
+| `weight_decay` | `float` | `0.0` | Weight decay (paper: keep `0` for fine-tuning) |
+| `ema` | `bool` | `true` | Use exponential moving average of weights |
+| `ema_decay` | `float` | `0.995` | EMA decay (paper: `> 0.99` for fine-tuning) |
+| `max_num_epochs` | `int` | `200` | Training epochs |
+| `batch_size` | `int` | `10` | Batch size |
+| `swa` | `bool` | `false` | Stochastic weight averaging (final-stage) |
+| `hidden_irreps` | `str \| null` | `null` | Model size for `scratch` (e.g. `"128x0e + 128x1o"`) |
+| `r_max` | `float` | `5.0` | Cutoff radius (Å) for `scratch` |
+| `device` | `str` | `"cpu"` | `"cpu"` or `"cuda"` |
+| `default_dtype` | `"float32" \| "float64"` | `"float64"` | Training precision |
+| `seed` | `int \| null` | `null` | Trainer seed (also used for the split) |
+| `extra` | `dict` | `{}` | Arbitrary `mace_run_train` flags (without `--`); **wins over** the defaults above |
+
+```toml
+[training]
+type             = "mace"
+name             = "cu_finetune"
+foundation_model = "medium"
+strategy         = "multihead"
+heads            = ["energy", "forces", "stress"]
+e0s              = "foundation"
+pt_train_file    = "mp"
+device           = "cuda"
+
+# escape hatch: pass any raw mace_run_train flag (overrides a default)
+[training.extra]
+scheduler = "ReduceLROnPlateau"
+```
+
+!!! note "Multi-head model selection"
+    `heads` chooses the MACE architecture automatically: `dipole` →
+    `EnergyDipolesMACE`/`AtomicDipolesMACE`, `polarizability` →
+    `AtomicDielectricMACE`. Override `--model`/`--loss`/keys via `[training.extra]`
+    if your MACE version differs.

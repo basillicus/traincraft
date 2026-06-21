@@ -1,0 +1,61 @@
+[run]
+name = "train_mace_finetune"
+seed = 9
+outdir = "runs"
+# Full spine end-to-end: build → sample → select → label → dataset → TRAIN.
+# The [training] section fine-tunes a MACE foundation model on the labelled
+# dataset. Training itself needs the `mace` env (torch + mace-torch) and ideally
+# a GPU — on HPC this stage runs in traincraft-mlip.sif. `traincraft submit`
+# renders it as a GPU (--nv) Slurm step; `traincraft run` runs it locally.
+#
+# Defaults follow Tompa et al. (arXiv:2606.12704): multihead replay fine-tuning,
+# E0s consistent with the foundation, weight_decay=0, high EMA, λ_E = λ_F = 10.
+# See docs: Training.
+
+[geometry.builder]
+type = "crystal"
+name = "Cu"
+crystalstructure = "fcc"
+a = 3.61
+cubic = true
+supercell = [2, 2, 2]
+
+[calculator]
+type = "emt"            # cheap exploration engine
+
+[sampling]
+type = "md"
+temperature = 600.0
+steps = 200
+interval = 20
+timestep = 2.0
+
+[selection]
+steps = ["physicality", "dedup", "diversity"]
+budget = 10
+min_distance = 0.7
+
+[labeling.calculator]
+type = "emt"            # real runs: type = "fhi_aims" / "qe"
+
+[dataset]
+path = "dataset"
+
+[training]
+type = "mace"
+name = "cu_finetune"
+foundation_model = "medium"   # small | medium | large | mace-mp0 | <path/to.model>
+strategy = "multihead"        # multihead replay (robust) | naive | scratch
+heads = ["energy", "forces", "stress"]
+e0s = "foundation"            # reuse the foundation E0s (paper: avoid "average")
+pt_train_file = "mp"          # replay data for multihead fine-tuning
+valid_fraction = 0.2
+max_num_epochs = 100
+batch_size = 5
+device = "cpu"                # "cuda" on a GPU node
+default_dtype = "float64"
+
+# Raman/IR target set instead would request the dielectric heads:
+#   heads = ["energy", "forces", "dipole", "polarizability"]
+# which selects MACE's AtomicDielectricMACE model + dipole_polar loss
+# (verify --model/--loss against your installed MACE; override via [training.extra]).

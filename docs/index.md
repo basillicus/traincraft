@@ -76,7 +76,7 @@ config file as the only glue.
 ```bash
 # Recommended: pixi (manages conda-forge + PyPI in one lockfile)
 curl -fsSL https://pixi.sh/install.sh | sh
-git clone https://github.com/your-org/traincraft && cd traincraft
+git clone https://github.com/basillicus/traincraft && cd traincraft
 pixi install          # core dependencies
 pixi install -e dev   # + pytest / ruff / mypy
 

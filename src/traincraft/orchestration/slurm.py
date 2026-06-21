@@ -7,6 +7,7 @@ cluster. The science is untouched — this only wires the stage functions to Slu
 
 Image map (overridable per stage in ``[orchestration.slurm.stages.*]``):
     sample -> traincraft-mlip.sif  (GPU/Booster, --nv)
+    train  -> traincraft-mlip.sif  (GPU/Booster, --nv)
     others -> traincraft-core.sif  (CPU)
 
 Two orthogonal axes make this portable across clusters (``[orchestration.slurm]``):
@@ -50,8 +51,9 @@ _DEFAULT_IMAGE = {
     "select": "traincraft-core.sif",
     "label": "traincraft-core.sif",
     "dataset": "traincraft-core.sif",
+    "train": "traincraft-mlip.sif",
 }
-_DEFAULT_GPUS = {"sample": 1}
+_DEFAULT_GPUS = {"sample": 1, "train": 1}
 
 _JOB_ID_RE = re.compile(r"Submitted batch job (\d+)")
 

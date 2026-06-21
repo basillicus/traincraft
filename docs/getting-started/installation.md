@@ -18,7 +18,7 @@ packages in one reproducible lockfile.
 curl -fsSL https://pixi.sh/install.sh | sh
 
 # Clone the repo
-git clone https://github.com/your-org/traincraft && cd traincraft
+git clone https://github.com/basillicus/traincraft && cd traincraft
 
 # Core environment (ASE, numpy, pydantic, typer — runs examples 01–07)
 pixi install
