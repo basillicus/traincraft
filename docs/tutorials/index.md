@@ -23,6 +23,7 @@ graph LR
     T8["8 · Selection Funnel<br/>(diversity, budget)"]
     T9["9 · Interop<br/>(pymatgen, RDKit)"]
     T10["10 · Training<br/>(fine-tune MACE)"]
+    T11["11 · AI Agent<br/>(OpenRouter + visualise)"]
 
     T1 --> T2
     T1 --> T4
@@ -34,6 +35,7 @@ graph LR
     T3 --> T9
     T7 --> T10
     T8 --> T10
+    T1 --> T11
 ```
 
 ---
@@ -52,3 +54,4 @@ graph LR
 | [8 · Selection Funnel](08-selection-funnel.md) | Any | None | `default` |
 | [9 · Interop](09-interop.md) | Any | pymatgen, RDKit | `science` |
 | [10 · Training](10-training.md) | Fine-tune MACE on a dataset | torch, mace-torch | `mace` |
+| [11 · AI Agent](11-ai-agent.md) | Drive TrainCraft in plain language + visualise on a headless VM | openai SDK (OpenRouter) | any |

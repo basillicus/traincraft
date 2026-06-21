@@ -111,6 +111,7 @@ nav:
     - "8 · The Selection Funnel": tutorials/08-selection-funnel.md
     - "9 · ASE · pymatgen · RDKit": tutorials/09-interop.md
     - "10 · Training a MACE Model": tutorials/10-training.md
+    - "11 · Driving It with an AI Agent": tutorials/11-ai-agent.md
   - Concepts:
     - concepts/index.md
     - Architecture: concepts/architecture.md
