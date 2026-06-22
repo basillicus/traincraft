@@ -417,6 +417,21 @@ Metropolis MC with rigid-body translate/rotate and optional conformer-swap moves
 | `refresh_fragments` | `bool` | `false` | Re-infer fragments after each accepted move |
 | `refresh_scale` | `float` | `1.2` | Bond-radius scale for `infer_fragments` |
 | `seed` | `int \| null` | `null` | RNG seed |
+| `record` | `"accepted" \| "trials"` | `"accepted"` | What to snapshot each `interval` (see below) |
+
+!!! tip "`record = "trials"` for unbiased MLIP training data"
+    Metropolis MC samples the **Boltzmann ensemble**: it accepts downhill moves and
+    only *occasionally* accepts uphill ones, so the default `record = "accepted"`
+    snapshots a chain concentrated **near equilibrium**. For training an interatomic
+    potential you usually want the opposite — a *broad* distribution including
+    high-energy, distorted geometries, so the model isn't biased toward the minimum.
+
+    `record = "trials"` snapshots every **proposed** move, accepted *or rejected*.
+    Those rejected proposals are exactly the high-energy, off-equilibrium points a
+    Metropolis filter would throw away — and their energy is already computed during
+    the run, so keeping them is nearly free. Each frame records
+    `tc_provenance.extra.mc_accepted` so you can tell proposals from the chain.
+    (For even broader force coverage, combine with `rattle` or high-temperature MD.)
 
 ### `type = "scan"`
 

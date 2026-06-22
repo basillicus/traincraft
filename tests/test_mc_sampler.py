@@ -36,6 +36,32 @@ def test_mc_returns_frames(cu_co_structure, workspace, tmp_path):
     assert len(frames) >= 1
 
 
+def _n_unique(frames):
+    return len({f.atoms.get_positions().tobytes() for f in frames})
+
+
+def test_record_trials_keeps_rejected_high_energy_geometries(cu_co_structure, workspace):
+    """At low T almost every move is rejected, so 'accepted' snapshots duplicate the
+    chain state while 'trials' records each distinct (incl. high-energy) proposal."""
+    common = dict(steps=30, interval=1, p_conformer=0.0, temperature=1.0, seed=0)
+
+    accepted = sample_monte_carlo(
+        cu_co_structure, EMT(), workspace.job("rec_acc"),
+        MonteCarloSampling(record="accepted", **common),
+    )
+    trials = sample_monte_carlo(
+        cu_co_structure, EMT(), workspace.job("rec_tri"),
+        MonteCarloSampling(record="trials", **common),
+    )
+
+    assert len(accepted) == len(trials) == 30
+    # The frozen chain barely moves at 1 K; trial proposals are all distinct.
+    assert _n_unique(trials) > _n_unique(accepted)
+    # Every trial frame is tagged with whether it was accepted.
+    assert all("mc_accepted" in f.provenance.extra for f in trials)
+    assert any(f.provenance.extra["mc_accepted"] is False for f in trials)
+
+
 def test_mc_substrate_atoms_frozen(cu_co_structure, workspace):
     """Substrate atoms (tc_fragment == -1) must not move during MC."""
     initial_pos = cu_co_structure.atoms.get_positions().copy()

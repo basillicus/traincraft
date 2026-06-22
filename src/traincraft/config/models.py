@@ -661,6 +661,12 @@ class MonteCarloSampling(TCModel):
     refresh_fragments: bool = False
     refresh_scale: float = 1.2
     seed: int | None = None
+    # What to snapshot each interval:
+    #   "accepted" — the MC chain state (Boltzmann ensemble, near-equilibrium).
+    #   "trials"   — every *proposed* move, accepted OR rejected. Keeps the
+    #                high-energy, off-equilibrium geometries a Metropolis filter
+    #                would discard — broad coverage for an unbiased MLIP dataset.
+    record: Literal["accepted", "trials"] = "accepted"
 
     @model_validator(mode="after")
     def _moves_nonzero(self) -> MonteCarloSampling:

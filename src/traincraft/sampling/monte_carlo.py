@@ -200,7 +200,8 @@ def sample_monte_carlo(structure: Structure, calc, job: Job, cfg) -> list[Struct
         e_trial = trial.get_potential_energy()
         delta_e = e_trial - e_current
 
-        if delta_e <= 0 or rng.random() < np.exp(-delta_e / kbt):
+        accepted = bool(delta_e <= 0 or rng.random() < np.exp(-delta_e / kbt))
+        if accepted:
             atoms = trial
             e_current = e_trial
             n_accepted += 1
@@ -217,26 +218,33 @@ def sample_monte_carlo(structure: Structure, calc, job: Job, cfg) -> list[Struct
                     )
 
         if (step + 1) % cfg.interval == 0:
+            # "accepted": snapshot the chain state (Boltzmann ensemble). "trials":
+            # snapshot the *proposed* geometry whether accepted or not, so the
+            # high-energy, off-equilibrium configs a Metropolis filter would discard
+            # are kept — broad coverage for an unbiased MLIP training set. The trial's
+            # energy is already computed above; only its forces are evaluated here.
+            snapshot = trial if cfg.record == "trials" else atoms
             props: dict = {}
             try:
-                props["energy"] = float(atoms.get_potential_energy())
-                props["forces"] = atoms.get_forces().copy()
+                props["energy"] = float(snapshot.get_potential_energy())
+                props["forces"] = snapshot.get_forces().copy()
             except Exception:  # noqa: BLE001
                 pass
 
             frames.append(
                 Structure.from_ase(
-                    atoms,
+                    snapshot,
                     properties=props,
                     provenance=Provenance(
                         origin="ml_sampled",
-                        source="sampler:monte_carlo",
+                        source=f"sampler:monte_carlo:{cfg.record}",
                         calculator=getattr(calc, "name", calc.__class__.__name__),
                         parents=[structure.hash],
+                        extra={"mc_accepted": accepted},
                     ),
                 )
             )
-            traj.write(atoms)
+            traj.write(snapshot)
 
     logger.info(
         "MC finished: %d steps, %d accepted (%.1f%%), %d frames recorded",
