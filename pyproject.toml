@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 # Install individually: pip install -e ".[mace]", pip install -e ".[sampling]", etc.
 mace        = ["mace-torch", "torch"]
-geometry    = ["rdkit", "pymatgen", "MDAnalysis", "mdapackmol-fmt"]
+geometry    = ["rdkit", "pymatgen"]
 pysoftk     = ["pysoftk"]          # separate: polymer builder; install from PyPI/GitHub
 descriptors = ["dscribe"]
 sampling    = ["hiphive"]
@@ -41,7 +41,7 @@ where = ["src"]
 # ---------------------------------------------------------------------------
 # Pixi: primary environment manager (mixes conda-forge + PyPI in one lockfile).
 # conda-forge provides packmol / hiphive / tblite / DFT tooling.
-# PyPI provides mace-torch, mdapackmol-fmt, dscribe, etc.
+# PyPI provides mace-torch, dscribe, etc.
 #
 # Usage:
 #   pixi install               # default env (core deps only)
@@ -83,18 +83,16 @@ hiphive = "*"
 tblite        = "*"
 tblite-python = "*"
 
-# geometry feature (Packmol + rdkit + pymatgen + MDAnalysis) ---------------
+# geometry feature (Packmol + rdkit + pymatgen) ----------------------------
+# Packmol is driven directly via subprocess + ASE xyz IO (see geometry/builders/
+# mixture.py), so no MDAnalysis/mdapackmol formatting layer is needed.
 [tool.pixi.feature.geometry.dependencies]
 packmol    = "*"
 rdkit      = "*"
 pymatgen   = "*"
-mdanalysis = "*"
 
-[tool.pixi.feature.geometry.pypi-dependencies]
-mdapackmol-fmt = "*"
-# pysoftk is listed separately; install manually if needed:
+# pysoftk (polymer builder) is listed separately; install manually if needed:
 #   pixi run pip install pysoftk
-# (not in PyPI index resolution until package name is confirmed)
 
 # descriptors feature (SOAP / ACE for near-dup selection) ------------------
 [tool.pixi.feature.descriptors.pypi-dependencies]
