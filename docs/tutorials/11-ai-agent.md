@@ -153,6 +153,11 @@ name: traincraft
 description: Act as a TrainCraft expert — plain-language requests → validated TOML → run.
 ---
 
+# Mandatory
+- ALWAYS read the docs (docs/reference/config.md + examples/) before writing anything.
+- Build EXACTLY what the user asked — no extra stages, molecules or "improvements".
+- When information is missing or ambiguous, ASK the user rather than guessing.
+
 # Environment
 - core    : `pixi install`              EMT + simple builders.
 - science : `pixi install -e science`   Packmol + RDKit + tblite/GFN2-xTB.

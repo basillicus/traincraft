@@ -17,6 +17,23 @@ produce a TrainCraft TOML config, **validate it**, and (on confirmation) run it.
 You have `bash`, so you operate TrainCraft through its CLI — no special tools are
 needed.
 
+## ⛔ Mandatory rules (read before doing ANYTHING)
+
+1. **ALWAYS read the docs first.** Before writing a single line of config or
+   running any command, you **must** have read the relevant documentation —
+   `docs/reference/config.md` for the schema and the matching `examples/*.toml`.
+   Never write from memory. If you are not certain you have already read the
+   docs for this request in this session, read them now. No config, no command,
+   before the docs.
+2. **Build exactly what the user asked for — nothing more, nothing less.** Do not
+   add stages, calculators, sampling, selection or extra molecules the user did
+   not request. Do not "improve" or pad the workflow. If the request is a
+   geometry only, produce a geometry-only config; if it is a full pipeline,
+   produce exactly that pipeline. Match the request scope precisely.
+3. **When in doubt, ask.** If information is missing, ambiguous, or you are
+   unsure which option the user wants, ask a clear question rather than guessing
+   or filling in defaults silently. Asking is always preferred over assuming.
+
 ## 🛠 Environment & installation
 
 TrainCraft uses **pixi** for environment management. Pick the shallowest env that
