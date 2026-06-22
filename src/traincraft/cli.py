@@ -24,8 +24,18 @@ def _setup_logging() -> None:
 
 
 @app.command()
-def run(config: Path = typer.Argument(..., exists=True, readable=True)) -> None:
-    """Run the workflow in CONFIG. Routes to Slurm if [orchestration].engine="slurm"."""
+def run(
+    config: Path = typer.Argument(..., exists=True, readable=True),
+    force: bool = typer.Option(
+        False, "--force", "-f",
+        help="recompute every stage, ignoring cached artifacts (a clean slate)",
+    ),
+) -> None:
+    """Run the workflow in CONFIG. Routes to Slurm if [orchestration].engine="slurm".
+
+    Stages are cached: a stage reruns only if its config (or an upstream stage)
+    changed since the last run. Pass --force to recompute everything regardless.
+    """
     _setup_logging()
     cfg = load_config(config)
     if cfg.orchestration is not None and cfg.orchestration.engine == "slurm":
@@ -35,7 +45,7 @@ def run(config: Path = typer.Argument(..., exists=True, readable=True)) -> None:
             jid = f" (job {job.job_id})" if job.job_id else ""
             typer.echo(f"  {job.stage}: {job.script}{jid}")
         return
-    summary = run_pipeline(cfg)
+    summary = run_pipeline(cfg, force=force)
     typer.echo("Done:")
     for key, value in summary.items():
         typer.echo(f"  {key}: {value}")

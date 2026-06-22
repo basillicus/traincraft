@@ -26,7 +26,7 @@ from .stages import (
 logger = logging.getLogger(__name__)
 
 
-def run_pipeline(config: TrainCraftConfig) -> dict:
+def run_pipeline(config: TrainCraftConfig, *, force: bool = False) -> dict:
     if config.geometry is None:
         raise ValueError("config has no [geometry] section: nothing to build")
 
@@ -34,12 +34,12 @@ def run_pipeline(config: TrainCraftConfig) -> dict:
     if config.run.seed is not None:
         np.random.seed(config.run.seed)
 
-    stage_geometry(config, ws)
-    candidates = stage_sample(config, ws)
-    selected = stage_select(config, ws)
-    labeled = stage_label(config, ws)
-    stage_dataset(config, ws)
-    stage_train(config, ws)
+    stage_geometry(config, ws, force=force)
+    candidates = stage_sample(config, ws, force=force)
+    selected = stage_select(config, ws, force=force)
+    labeled = stage_label(config, ws, force=force)
+    stage_dataset(config, ws, force=force)
+    stage_train(config, ws, force=force)
 
     dataset_path = None
     if config.dataset is not None:
