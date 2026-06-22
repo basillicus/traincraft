@@ -13,14 +13,15 @@ traincraft --help
 Run the complete workflow declared in a TOML config file.
 
 ```bash
-traincraft run CONFIG
+traincraft run CONFIG [--force]
 ```
 
-**Arguments:**
+**Arguments / options:**
 
-| Argument | Description |
+| Argument / option | Description |
 |---|---|
 | `CONFIG` | Path to a `.toml` file (must exist and be readable) |
+| `--force`, `-f` | Recompute **every** stage, ignoring cached artifacts (a clean slate) |
 
 **What it does:**
 
@@ -50,10 +51,20 @@ Done:
   dataset:      runs/07_co_on_cu_mc/dataset.extxyz
 ```
 
-!!! tip "Rerunning is safe"
-    Each run writes to a named workspace. Running the same config twice writes
-    to the same workspace and **appends** to the dataset (deduplicating by hash).
-    Nothing is ever overwritten.
+!!! tip "Smart caching — rerunning only redoes what changed"
+    Each stage writes a sidecar `<artifact>.key` fingerprinting the inputs that
+    produced it: its own config section (plus the run seed) **and** the upstream
+    stage's key. On a rerun a stage is skipped only if its artifact exists *and*
+    that fingerprint still matches.
+
+    So if you **edit the config and rerun**, the stages whose settings changed —
+    and everything downstream of them — recompute automatically, while unrelated
+    or expensive stages (e.g. DFT labeling) stay cached. Rerunning an *unchanged*
+    config is a no-op that finishes in seconds.
+
+    Pass `--force` to ignore the fingerprints and recompute everything from
+    scratch. (Per stage, the same escape hatch is `traincraft stage NAME CONFIG
+    --force`.)
 
 ---
 
