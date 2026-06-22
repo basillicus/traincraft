@@ -1,23 +1,23 @@
-# Tutorial 11 · Driving TrainCraft with an AI Agent
+# Tutorial 11 · Driving TrainCraft with the Pi Agent
 
-**What you'll learn:** how to point a large-language-model *agent* at TrainCraft
-so you can describe what you want in plain language ("fill a (10,10) nanotube
-with a 3:1 water/ethanol blend and run a short MD") and have it write the TOML,
-validate it, and launch the run — plus how to **see the geometries it builds**
-when you're working on a headless VM with no graphical display.
+**What you'll learn:** how to drive TrainCraft in plain language with the
+[Pi](https://pi.dev) coding agent running a Gemma model — you describe a system
+or workflow ("fill a (10,10) nanotube with a 3:1 water/ethanol blend and run a
+short MD"), and Pi writes the TOML, validates it, and launches the run — plus
+how to **see the geometries it builds** on a headless VM with no display.
 
 **Prerequisites:** TrainCraft installed (the `science` pixi env if you want
-Packmol/RDKit systems), and an [OpenRouter](https://openrouter.ai) account.
+Packmol/RDKit systems) and the [Pi agent](https://pi.dev).
 
-**Time:** ~20 minutes.
+**Time:** ~15 minutes.
 
-!!! note "This is bring-your-own-agent"
-    TrainCraft does **not** ship an agent. It ships a clean CLI and a large but
-    regular TOML config surface — exactly the kind of thing an LLM is good at
-    filling in. This tutorial shows the *pattern*: a system prompt (a "skill")
-    that teaches the agent the repo's gotchas, plus an LLM behind it. It works
-    with any agent runner you like; the only TrainCraft-specific part is the
-    skill and the commands the agent is allowed to run.
+!!! note "TrainCraft doesn't ship an agent — Pi does the agentic work"
+    TrainCraft ships a clean CLI and a large but regular TOML config surface —
+    exactly the kind of thing an LLM is good at filling in. Pi is the agent: it
+    reads the schema, writes configs, runs the CLI, and reacts to errors. The
+    only TrainCraft-specific piece is a **skill** — a small Markdown file that
+    teaches Pi this repo's commands and gotchas. You point Pi at the skill once
+    and it configures itself from there.
 
 ---
 
@@ -26,20 +26,18 @@ Packmol/RDKit systems), and an [OpenRouter](https://openrouter.ai) account.
 The config surface has grown: builders for molecules, surfaces, slabs, crystals,
 2D materials and filled nanotubes; mixtures with arbitrary ratios; alloy
 compositions; samplers; the selection funnel; calculators; HPC orchestration.
-Memorising every key is a chore. But the *rules* are regular and the
-[Config Schema](../reference/config.md) is exhaustive, so an LLM that has read
-the schema and a handful of [`examples/`](https://github.com/basillicus/traincraft/tree/main/examples)
-can assemble a correct config from one sentence — and `traincraft validate`
-tells it immediately if it got something wrong.
-
-The loop is simply:
+Memorising every key is a chore — but the *rules* are regular, the
+[Config Schema](../reference/config.md) is exhaustive, and `traincraft validate`
+tells the agent immediately if it got something wrong. So an agent that has read
+the skill and a few [`examples/`](https://github.com/basillicus/traincraft/tree/main/examples)
+can assemble a correct config from one sentence:
 
 ```mermaid
 graph LR
-    U["You<br/>(plain language)"] --> A["Agent (LLM)"]
-    A -->|writes| C["config.toml"]
+    U["You<br/>(plain language)"] --> P["Pi agent<br/>(Gemma)"]
+    P -->|writes| C["config.toml"]
     C --> V["traincraft validate"]
-    V -->|errors| A
+    V -->|errors| P
     V -->|OK| R["traincraft run"]
     R --> G["geometry / dataset<br/>in runs/"]
     G -->|render| U
@@ -47,43 +45,84 @@ graph LR
 
 ---
 
-## Step 1 · An OpenRouter key and a model
-
-[OpenRouter](https://openrouter.ai) is an OpenAI-compatible gateway to many
-models, so you can start cheaply with an open model and swap later without
-changing code. A mid-size open model (e.g. a Gemma — use the exact slug shown on
-[openrouter.ai/models](https://openrouter.ai/models), such as
-`google/gemma-3-27b-it`) is plenty for writing TrainCraft configs; reach for a
-larger model only if you ask it to reason about the *science*.
+## Step 1 · Install Pi
 
 ```bash
-export OPENROUTER_API_KEY="sk-or-..."
+curl -fsSL https://pi.dev/install.sh | sh
 ```
 
-Because the endpoint is OpenAI-compatible, most agent runners pick it up via the
-standard OpenAI env vars:
-
-```bash
-export OPENAI_API_KEY="$OPENROUTER_API_KEY"
-export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-```
-
-!!! warning "Keep the key out of git"
-    Put these in your shell profile or a `.env` file that is **gitignored** —
-    never in a committed config.
+(`npm install -g --ignore-scripts @earendil-works/pi-coding-agent` also works.)
+Pi is a minimal harness: the model gets a few tools — read, write, edit, and
+**bash** — which is all it needs to run `traincraft` and `pixi`.
 
 ---
 
-## Step 2 · The skill (system prompt)
+## Step 2 · Point Pi at `gemma4-31b-it`
 
-This is the only TrainCraft-specific piece. Give it to your agent as the system
-prompt / skill. It front-loads the gotchas so the agent doesn't have to
-rediscover them every session:
+Pi reads model definitions from `~/.pi/agent/models.json`. Register
+[`gemma4-31b-it`](https://huggingface.co) behind whatever OpenAI-compatible
+endpoint you serve it from — a local server (vLLM, llama.cpp, Ollama, …) or a
+hosted gateway — by giving its base URL:
 
-```markdown title="traincraft-skill.md"
-You are an assistant that drives TrainCraft, a tool for generating MLIP training
-datasets. The user describes a system or workflow in plain language; you produce
-a TrainCraft TOML config, validate it, and (on confirmation) run it.
+```json title="~/.pi/agent/models.json"
+{
+  "providers": {
+    "gemma": {
+      "baseUrl": "http://localhost:8000/v1",   // your gemma4-31b-it endpoint
+      "api": "openai-completions",
+      "apiKey": "local",                        // any string if the server ignores it
+      "models": [
+        { "id": "gemma4-31b-it" }
+      ]
+    }
+  }
+}
+```
+
+Then start Pi in the TrainCraft repo and select the model:
+
+```bash
+cd /path/to/traincraft
+pi
+# inside Pi:  /model   → pick gemma4-31b-it   (or cycle with Ctrl+L)
+```
+
+!!! tip "Serving the model"
+    `gemma4-31b-it` is a Hugging Face model; serve it however you like as long as
+    the endpoint speaks the OpenAI chat/completions API. `vllm serve <repo-id>`
+    or an Ollama instance (`"baseUrl": "http://localhost:11434/v1"`) both work —
+    just match `baseUrl` and the model `id` to your server.
+
+---
+
+## Step 3 · Give Pi the TrainCraft skill
+
+The skill is a single Markdown file following Pi's
+[Agent Skills](https://pi.dev) standard. It front-loads this repo's gotchas so
+Pi configures itself and knows how to operate on your instructions. Host it in
+the repo (e.g. `skills/traincraft/SKILL.md`) and have Pi install it:
+
+```bash
+# inside Pi — install from git (or npm), then reload:
+pi install git:github.com/basillicus/traincraft
+/reload
+```
+
+…or simply tell Pi in chat: *"download the TrainCraft skill from `<url>`, install
+it, and set yourself up."* Pi has read/write/bash tools, so it can fetch the file
+into `~/.pi/agent/skills/`, read it, and apply it — no manual wiring.
+
+The skill itself:
+
+```markdown title="skills/traincraft/SKILL.md"
+---
+name: traincraft
+description: Drive TrainCraft — generate MLIP training datasets from plain-language requests.
+---
+
+You drive TrainCraft, a tool for generating MLIP training datasets. The user
+describes a system or workflow in plain language; you produce a TrainCraft TOML
+config, validate it, and (on confirmation) run it.
 
 # How to work
 1. Read `docs/reference/config.md` for the full schema and `examples/*.toml` for
@@ -124,64 +163,6 @@ a TrainCraft TOML config, validate it, and (on confirmation) run it.
 - `pixi run -e <env> traincraft run <file>`   run the pipeline
 ```
 
-The exact mechanism for loading this depends on your agent runner — it's the
-file your runner reads as the system prompt / skill before the conversation
-starts. (You mentioned you're wiring one up; this is the content to put in it.)
-
----
-
-## Step 3 · A minimal agent loop (if you're rolling your own)
-
-If you don't already have a runner, here is the whole thing in ~30 lines with the
-`openai` SDK pointed at OpenRouter. It asks the model for a config, writes it,
-validates it, and feeds any error back — no special tool-calling support
-required, so it works even with smaller open models:
-
-```python title="agent.py"
-import os, re, subprocess, pathlib
-from openai import OpenAI
-
-client = OpenAI(
-    api_key=os.environ["OPENROUTER_API_KEY"],
-    base_url="https://openrouter.ai/api/v1",
-)
-MODEL = "google/gemma-3-27b-it"  # use the exact slug from openrouter.ai/models
-SKILL = pathlib.Path("traincraft-skill.md").read_text()
-
-def ask(messages):
-    r = client.chat.completions.create(model=MODEL, messages=messages)
-    return r.choices[0].message.content
-
-def extract_toml(text):
-    m = re.search(r"```(?:toml)?\n(.*?)```", text, re.S)
-    return m.group(1) if m else None
-
-msgs = [{"role": "system", "content": SKILL}]
-msgs.append({"role": "user", "content": input("What do you want to build? ")})
-
-for _ in range(4):                       # a few self-correction rounds
-    reply = ask(msgs); print(reply)
-    toml = extract_toml(reply)
-    if not toml:
-        break
-    path = pathlib.Path("examples/_agent.toml"); path.write_text(toml)
-    chk = subprocess.run(["traincraft", "validate", str(path)],
-                         capture_output=True, text=True)
-    if chk.returncode == 0:
-        print("✅ valid. Run with:  pixi run -e science traincraft run", path)
-        break
-    msgs += [{"role": "assistant", "content": reply},
-             {"role": "user", "content": f"validate failed:\n{chk.stderr or chk.stdout}\nFix it."}]
-```
-
-```bash
-pixi run -e science python agent.py
-```
-
-A real runner adds: letting the agent *read* files (so it can grep the schema),
-asking before it runs anything, and streaming output. But the spine is exactly
-the loop above — and `traincraft validate` is what keeps the model honest.
-
 ---
 
 ## Step 4 · A worked session
@@ -189,7 +170,7 @@ the loop above — and `traincraft validate` is what keeps the model honest.
 > **You:** Fill a roomy carbon nanotube with a 3-to-1 mixture of water and
 > ethanol, 12 molecules total, and run a short MD at 350 K.
 
-The agent recalls that `filled_nanotube` + a `species` mixture needs the
+Pi recalls from the skill that `filled_nanotube` + a `species` mixture needs the
 `science` env, that ethanol is best given as a SMILES while water is best as a
 `molecule_name`, and writes:
 
@@ -251,7 +232,7 @@ options, lightest first.
 ### Option A — Headless PNG (zero install, agent-friendly)
 
 ASE renders straight to a PNG with matplotlib's Agg backend (already in the
-`science` env), so the agent itself can produce a picture and hand you the file:
+`science` env), so Pi itself can produce a picture and hand you the file:
 
 ```python title="render.py"
 import sys
@@ -267,9 +248,9 @@ write("preview.png", atoms,
 pixi run -e science python render.py runs/tube_waterethanol/geometry/structure.xyz
 ```
 
-Then just `scp` `preview.png` to your laptop (or have the agent embed it in its
-reply). This is the most robust option — it works over plain SSH with nothing
-forwarded. Have your **agent call this after every build** so each structure
+Then just `scp` `preview.png` to your laptop (or have Pi embed it in its reply).
+This is the most robust option — it works over plain SSH with nothing forwarded.
+Tell Pi (via the skill) to **call this after every build** so each structure
 comes back with a thumbnail.
 
 ### Option B — Jupyter Lab + a WebGL widget (interactive, recommended)
@@ -300,10 +281,8 @@ from ase.io import read
 WeasWidget(from_ase=read("runs/tube_waterethanol/geometry/structure.xyz"))
 ```
 
-Because the notebook and the agent run on the same VM, this doubles as your
-**shared surface**: converse with the agent in one cell, render/nudge the
-structure it just wrote in the next, and re-run. For MD output, point the reader
-at the multi-frame `.extxyz` trajectory and the widget will let you scrub frames.
+For MD output, point the reader at the multi-frame `.extxyz` trajectory and the
+widget will let you scrub frames.
 
 ### Option C — A static py3Dmol page served over a port
 
@@ -324,18 +303,13 @@ python -m http.server 8000          # serve the folder
 # laptop:  ssh -L 8000:localhost:8000 you@your-vm  →  open http://localhost:8000/view.html
 ```
 
-### What about "chat *and* edit the geometry in one browser app"?
-
-That single integrated app — chat on one side, a live 3D editor on the other,
-both wired to the agent — is **not** something TrainCraft ships, and there's no
-turnkey tool that does exactly this for arbitrary agents today. The honest,
-working path is Jupyter (Option B): it gives you chat + WebGL editing + the
-ability to re-run TrainCraft in one port-forwarded browser tab. If you want a
-purpose-built page, the small-but-real DIY route is a
-[Streamlit](https://streamlit.io)/[Gradio](https://www.gradio.app) app combining
-a chat box with [`stmol`](https://github.com/napoles-uach/stmol) (py3Dmol in
-Streamlit) for the viewer — a few dozen lines, but you own it. Treat that as a
-future project rather than a built-in.
+!!! info "A purpose-built workbench is on the roadmap"
+    A single browser app — Pi's chat alongside tabs for the geometry, a
+    node-based workflow editor, and dataset exploration with
+    [chemiscope](https://github.com/lab-cosmo/chemiscope) — is on the
+    [roadmap](../roadmap.md). Until then, Jupyter (Option B) is the closest
+    ready-made surface: chat to Pi in one cell, render/nudge the structure in the
+    next, re-run.
 
 ---
 
@@ -343,18 +317,18 @@ future project rather than a built-in.
 
 - **Validate before running.** `traincraft validate` is cheap and catches the
   vast majority of the agent's mistakes before any compute is spent.
-- **Right env, every time.** Make the agent prefix runs with
+- **Right env, every time.** The skill makes Pi prefix runs with
   `pixi run -e science` for anything touching Packmol/RDKit/xTB. A run in the
   `default` env will fail on those imports.
 - **Confirm before launching long jobs** (MD, MACE training, Slurm submission).
 - **Never install outside an env.** Pixi environments *are* the virtualenvs;
-  the agent should add deps with `pixi add`, not a global `pip install`.
+  Pi should add deps with `pixi add`, not a global `pip install`.
 
 ---
 
 ## Where to go next
 
-- [Config Schema](../reference/config.md) — the reference the agent should read.
+- [Config Schema](../reference/config.md) — the reference the skill points Pi at.
 - [Geometry System](../concepts/geometry.md) — mixtures, alloys, fragments.
-- [Run on HPC](../how-to/hpc.md) — once the agent's configs are good, dispatch
-  them to a Slurm cluster.
+- [Run on HPC](../how-to/hpc.md) — once Pi's configs are good, dispatch them to a
+  Slurm cluster.
