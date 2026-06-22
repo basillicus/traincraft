@@ -13,6 +13,23 @@ from ase.build import molecule
 from ase.io import read
 
 
+def _reject_smiles_whitespace(smiles: str) -> None:
+    """Reject a SMILES containing whitespace.
+
+    In SMILES, a space separates the structure from an optional molecule *name*,
+    so RDKit silently keeps only the text before the first space (e.g. ``"OCCCCC O"``
+    parses as pentanol, dropping the second oxygen). That would build the wrong
+    molecule with no error, so we refuse it up front.
+    """
+    if any(ch.isspace() for ch in smiles):
+        raise ValueError(
+            f"SMILES {smiles!r} contains whitespace. In SMILES a space separates the "
+            "structure from an optional molecule name, so RDKit would silently keep "
+            "only the part before the space and drop the rest. Remove the space "
+            "(e.g. 'OCCCCCO' for pentane-1,5-diol)."
+        )
+
+
 def _resolve_adsorbate(molecule_name, smiles, file) -> Atoms:
     """Return an ``ase.Atoms`` for a species from whichever field is set.
 
@@ -25,6 +42,7 @@ def _resolve_adsorbate(molecule_name, smiles, file) -> Atoms:
     if molecule_name is not None:
         return molecule(molecule_name)
     if smiles is not None:
+        _reject_smiles_whitespace(smiles)
         try:
             from rdkit import Chem
             from rdkit.Chem import AllChem

@@ -28,7 +28,7 @@ from ase import Atoms
 from ase.data import atomic_numbers, covalent_radii, vdw_radii
 from ase.io import read, write
 
-from ._adsorbate import _canonical_smiles, _resolve_adsorbate
+from ._adsorbate import _resolve_adsorbate
 
 
 def vdw_radius(symbol: str) -> float:
@@ -87,8 +87,10 @@ def resolve_mixture(species: list, total: int | None = None) -> list[tuple]:
     out: list[tuple] = []
     for s, n in zip(species, counts, strict=True):
         atoms = _resolve_adsorbate(s.molecule_name, s.smiles, s.file)
-        canonical = _canonical_smiles(s.smiles) if s.smiles is not None else None
-        out.append((atoms, n, s.label, canonical))
+        # Record the *original* SMILES (not the canonical one) so an MC conformer
+        # rebuild reproduces the same atom order as `atoms`; a reordered rebuild
+        # would corrupt the molecule (see sampling.monte_carlo._move_conformer).
+        out.append((atoms, n, s.label, s.smiles))
     return out
 
 

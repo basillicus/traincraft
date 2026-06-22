@@ -18,6 +18,9 @@ def source_smiles(cfg) -> Structure:
             "Install it with: pixi install -e science  (or: uv pip install rdkit)"
         ) from e
 
+    from ..builders._adsorbate import _reject_smiles_whitespace
+
+    _reject_smiles_whitespace(cfg.smiles)
     mol = Chem.MolFromSmiles(cfg.smiles)
     if mol is None:
         raise ValueError(f"RDKit could not parse SMILES: {cfg.smiles!r}")
@@ -60,7 +63,12 @@ def source_smiles(cfg) -> Structure:
             extra={
                 "smiles": canonical,
                 "n_conformers": cfg.n_conformers,
-                "fragment_smiles": {"0": canonical},
+                # Record the *original* SMILES (not the canonical one) so a conformer
+                # rebuild reproduces the exact atom order of `atoms` — the MC
+                # conformer move copies coordinates index-for-index, so a reordered
+                # rebuild would put each element's coords on the wrong atom. See
+                # sampling.monte_carlo._move_conformer.
+                "fragment_smiles": {"0": cfg.smiles},
             },
         ),
     )

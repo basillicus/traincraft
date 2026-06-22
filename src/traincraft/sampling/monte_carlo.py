@@ -81,7 +81,10 @@ def _move_conformer(
     except ImportError:
         return False
 
-    mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
+    parsed = Chem.MolFromSmiles(smiles)
+    if parsed is None:
+        return False
+    mol = Chem.AddHs(parsed)
     params = AllChem.ETKDGv3()
     params.randomSeed = int(rng.integers(0, 2**31))
     if AllChem.EmbedMolecule(mol, params) < 0:
@@ -89,11 +92,24 @@ def _move_conformer(
     AllChem.MMFFOptimizeMolecule(mol)
     conf = mol.GetConformer(0)
     new_pos = np.array(conf.GetPositions())
+    new_syms = [a.GetSymbol() for a in mol.GetAtoms()]
 
     mask = fragment_mask(atoms, fid)
     old_pos = atoms.get_positions()[mask]
 
-    if len(new_pos) != int(mask.sum()):
+    # The new conformer's atoms are copied into the fragment slots index-for-index
+    # below, so they MUST line up 1:1 — same count, same elements, same order — as
+    # the fragment's atoms. If they don't (e.g. a canonical-SMILES rebuild reorders
+    # the atoms), copying would drop each element's coordinates onto the WRONG atom
+    # and silently corrupt the molecule (an OH's H landing on a CH3, etc.). Refuse
+    # the move rather than emit a broken geometry.
+    frag_syms = [s for s, m in zip(atoms.get_chemical_symbols(), mask, strict=True) if m]
+    if new_syms != frag_syms:
+        logger.warning(
+            "monte_carlo: conformer move skipped — rebuilt atom order %s does not "
+            "match fragment %d (%s); not applying to avoid corrupting the molecule",
+            "".join(new_syms), fid, "".join(frag_syms),
+        )
         return False
 
     old_centroid = old_pos.mean(axis=0)

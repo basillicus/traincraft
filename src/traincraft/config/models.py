@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _expand_path(value: str) -> str:
@@ -58,6 +58,19 @@ class SmilesSource(TCModel):
     optimize: bool = True
     seed: int | None = None
     vacuum: float = 6.0
+
+    @field_validator("smiles")
+    @classmethod
+    def _no_whitespace(cls, v: str) -> str:
+        # A space in SMILES is a name separator: RDKit would silently keep only the
+        # text before it (e.g. "OCCCCC O" -> pentanol, dropping the second O).
+        if any(ch.isspace() for ch in v):
+            raise ValueError(
+                f"SMILES {v!r} contains whitespace. In SMILES a space separates the "
+                "structure from an optional molecule name, so part of your input would "
+                "be silently dropped. Remove the space (e.g. 'OCCCCCO')."
+            )
+        return v
 
 
 class UrlSource(TCModel):
