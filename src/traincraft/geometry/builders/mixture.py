@@ -82,7 +82,12 @@ def species_counts(species: list, total: int | None) -> list[int]:
 
 
 def resolve_mixture(species: list, total: int | None = None) -> list[tuple]:
-    """Return ``[(atoms, count, label, canonical_smiles_or_None), ...]``."""
+    """Return ``[(atoms, count, label, smiles_or_None), ...]``.
+
+    The 4th element is the species' *original* SMILES (or None) — used to rebuild
+    conformers in MC; it must preserve the atom order of ``atoms``, so it is not
+    canonicalised.
+    """
     counts = species_counts(species, total)
     out: list[tuple] = []
     for s, n in zip(species, counts, strict=True):
@@ -158,13 +163,13 @@ def tag_mixture(frag: np.ndarray, resolved: list[tuple], cursor: int) -> tuple:
     fragment_smiles: dict[str, str] = {}
     fragment_species: dict[str, str] = {}
     fid = 0
-    for atoms, n, label, canonical in resolved:
+    for atoms, n, label, smiles in resolved:
         n_at = len(atoms)
         for _ in range(n):
             frag[cursor : cursor + n_at] = fid
             fragment_species[str(fid)] = label
-            if canonical is not None:
-                fragment_smiles[str(fid)] = canonical
+            if smiles is not None:
+                fragment_smiles[str(fid)] = smiles
             cursor += n_at
             fid += 1
     return fid, fragment_smiles, fragment_species, cursor

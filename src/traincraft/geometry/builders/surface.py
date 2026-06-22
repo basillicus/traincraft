@@ -71,9 +71,12 @@ def build_surface_adsorbate(cfg) -> Structure:
     if composition:
         extra["composition"] = composition
     if cfg.smiles is not None:
-        canonical = _canonical_smiles(cfg.smiles)
-        extra["smiles"] = canonical
-        extra["fragment_smiles"] = {"0": canonical}
+        extra["smiles"] = _canonical_smiles(cfg.smiles)  # canonical: provenance display only
+        # Reconstruction SMILES must be the *original* so an MC conformer rebuild
+        # reproduces this adsorbate's exact atom order (see monte_carlo._move_conformer);
+        # the canonical form reorders atoms and the move would then (correctly) skip,
+        # silently disabling conformer exploration for the adsorbate.
+        extra["fragment_smiles"] = {"0": cfg.smiles}
 
     return Structure.from_ase(
         slab,

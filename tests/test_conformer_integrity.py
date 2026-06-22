@@ -62,6 +62,30 @@ def test_conformer_move_preserves_chemistry():
     assert _o_neighbor_elements(atoms) == ["C", "H"]
 
 
+def test_conformer_move_applies_for_smiles_adsorbate_on_surface():
+    """A flexible SMILES adsorbate on a surface must still get conformer moves
+    (the substrate stays frozen) — i.e. exploration is not hindered."""
+    pytest.importorskip("rdkit")
+    from traincraft.config.models import SurfaceAdsorbateBuilder
+    from traincraft.core.fragments import FRAMEWORK, get_fragments
+    from traincraft.geometry.builders.surface import build_surface_adsorbate
+    from traincraft.sampling.monte_carlo import _move_conformer
+
+    s = build_surface_adsorbate(
+        SurfaceAdsorbateBuilder(element="Cu", facet="fcc111", size=(2, 2, 3),
+                                smiles="CCO", site="ontop")  # ethanol: flexible
+    )
+    atoms = s.atoms.copy()
+    frag = get_fragments(atoms)
+    sub_pos = atoms.get_positions()[frag == FRAMEWORK].copy()
+
+    applied = _move_conformer(atoms, 0, np.random.default_rng(0),
+                              s.provenance.extra["fragment_smiles"])
+    assert applied is True  # NOT skipped — adsorbate conformer exploration works
+    # substrate untouched by the adsorbate conformer move
+    np.testing.assert_array_equal(atoms.get_positions()[frag == FRAMEWORK], sub_pos)
+
+
 def test_conformer_move_skips_on_reordered_smiles():
     """The old bug: a canonical (reordered) SMILES. The move must now REFUSE."""
     pytest.importorskip("rdkit")
