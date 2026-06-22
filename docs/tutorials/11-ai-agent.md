@@ -59,109 +59,122 @@ Pi is a minimal harness: the model gets a few tools — read, write, edit, and
 
 ## Step 2 · Point Pi at `gemma4-31b-it`
 
-Pi reads model definitions from `~/.pi/agent/models.json`. Register
-[`gemma4-31b-it`](https://huggingface.co) behind whatever OpenAI-compatible
-endpoint you serve it from — a local server (vLLM, llama.cpp, Ollama, …) or a
-hosted gateway — by giving its base URL:
+Pi reads model definitions from `~/.pi/agent/models.json`. `gemma4-31b-it` is a
+[Hugging Face](https://huggingface.co) model, so you can point Pi at **any**
+OpenAI-compatible endpoint that serves it — you're free to use your own. The two
+common starting points:
 
-```json title="~/.pi/agent/models.json"
-{
-  "providers": {
-    "gemma": {
-      "baseUrl": "http://localhost:8000/v1",   // your gemma4-31b-it endpoint
-      "api": "openai-completions",
-      "apiKey": "local",                        // any string if the server ignores it
-      "models": [
-        { "id": "gemma4-31b-it" }
-      ]
+=== "OpenRouter (no endpoint of your own)"
+
+    The quickest way to start if you don't run a server. At the time of writing
+    OpenRouter offers a **free** tier of this model — get a key from
+    [openrouter.ai](https://openrouter.ai) and register it:
+
+    ```json title="~/.pi/agent/models.json"
+    {
+      "providers": {
+        "openrouter": {
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "api": "openai-completions",
+          "apiKey": "sk-or-...",                // your OpenRouter key
+          "models": [
+            { "id": "google/gemma-4-31b-it:free" }   // use the exact slug from openrouter.ai/models
+          ]
+        }
+      }
     }
-  }
-}
-```
+    ```
+
+    !!! danger "Free models are not private"
+        On free/community tiers the provider may log and train on your prompts.
+        **Never send confidential, unpublished, or proprietary structures,
+        datasets or research through a free model.** For anything sensitive,
+        serve the model yourself (next tab) or use a paid, no-logging endpoint.
+
+=== "Your own endpoint (local or hosted)"
+
+    Serve `gemma4-31b-it` with vLLM, llama.cpp, Ollama, … — anything that speaks
+    the OpenAI chat/completions API — and give Pi its base URL:
+
+    ```json title="~/.pi/agent/models.json"
+    {
+      "providers": {
+        "gemma": {
+          "baseUrl": "http://localhost:8000/v1",   // your gemma4-31b-it endpoint
+          "api": "openai-completions",
+          "apiKey": "local",                        // any string if the server ignores it
+          "models": [
+            { "id": "gemma4-31b-it" }
+          ]
+        }
+      }
+    }
+    ```
+
+    Keeps your data on your own hardware/account — the right choice for private
+    work. `vllm serve <repo-id>` or an Ollama instance
+    (`"baseUrl": "http://localhost:11434/v1"`) both work; just match `baseUrl`
+    and the model `id` to your server.
 
 Then start Pi in the TrainCraft repo and select the model:
 
 ```bash
 cd /path/to/traincraft
 pi
-# inside Pi:  /model   → pick gemma4-31b-it   (or cycle with Ctrl+L)
+# inside Pi:  /model   → pick your gemma4-31b-it entry   (or cycle with Ctrl+L)
 ```
-
-!!! tip "Serving the model"
-    `gemma4-31b-it` is a Hugging Face model; serve it however you like as long as
-    the endpoint speaks the OpenAI chat/completions API. `vllm serve <repo-id>`
-    or an Ollama instance (`"baseUrl": "http://localhost:11434/v1"`) both work —
-    just match `baseUrl` and the model `id` to your server.
 
 ---
 
 ## Step 3 · Give Pi the TrainCraft skill
 
 The skill is a single Markdown file following Pi's
-[Agent Skills](https://pi.dev) standard. It front-loads this repo's gotchas so
-Pi configures itself and knows how to operate on your instructions. Host it in
-the repo (e.g. `skills/traincraft/SKILL.md`) and have Pi install it:
+[Agent Skills](https://pi.dev) standard. It front-loads this repo's commands and
+gotchas so Pi configures itself and knows how to operate on your instructions. It
+**ships in the repo** at
+[`skills/traincraft/SKILL.md`](https://github.com/basillicus/traincraft/blob/main/skills/traincraft/SKILL.md),
+so that file is the single source of truth — install it and reload:
 
 ```bash
-# inside Pi — install from git (or npm), then reload:
+# inside Pi — install the repo's skill (or from npm), then reload:
 pi install git:github.com/basillicus/traincraft
 /reload
 ```
 
-…or simply tell Pi in chat: *"download the TrainCraft skill from `<url>`, install
-it, and set yourself up."* Pi has read/write/bash tools, so it can fetch the file
-into `~/.pi/agent/skills/`, read it, and apply it — no manual wiring.
+…or simply tell Pi in chat: *"read `skills/traincraft/SKILL.md` and set yourself
+up."* Pi has read/write/bash tools, so it fetches the file into
+`~/.pi/agent/skills/`, reads it, and applies it — no manual wiring.
 
-The skill itself:
+A trimmed excerpt of what it teaches Pi:
 
-```markdown title="skills/traincraft/SKILL.md"
+```markdown title="skills/traincraft/SKILL.md (excerpt)"
 ---
 name: traincraft
-description: Drive TrainCraft — generate MLIP training datasets from plain-language requests.
+description: Act as a TrainCraft expert — plain-language requests → validated TOML → run.
 ---
 
-You drive TrainCraft, a tool for generating MLIP training datasets. The user
-describes a system or workflow in plain language; you produce a TrainCraft TOML
-config, validate it, and (on confirmation) run it.
+# Environment
+- core    : `pixi install`              EMT + simple builders.
+- science : `pixi install -e science`   Packmol + RDKit + tblite/GFN2-xTB.
+- mace    : `pixi install -e mace`       torch + mace-torch.
+Always run with `pixi run -e <env> traincraft run <file>`. `liquid`,
+`surface_packing`, `filled_nanotube` and any SMILES need `-e science`.
 
-# How to work
-1. Read `docs/reference/config.md` for the full schema and `examples/*.toml` for
-   patterns. When unsure of a key, grep the examples rather than guessing.
-2. Write the config to `examples/` or a working dir. Then ALWAYS run
-   `traincraft validate <file>` and fix any error before running.
-3. Only run with `pixi run -e <env> traincraft run <file>` so dependencies
-   resolve. NEVER pip-install into the base system — pixi envs are the venvs.
-4. After a run, point the user at the output in `runs/<name>/` and offer to
-   render the geometry (see "Visualising", below).
+# Workflow
+Docs first (grep docs/ + examples/, don't guess keys) → write TOML →
+`traincraft validate <file>` → run → review `runs/<name>/`.
 
-# Pixi environments (which one to run in)
-- `default` : EMT, simple builders (nanotube, crystal, slab, 2D). No heavy deps.
-- `science` : Packmol + RDKit + tblite/GFN2-xTB. REQUIRED for `liquid`,
-  `surface_packing`, `filled_nanotube`, SMILES molecules, and C/H/O/N chemistry.
-- `mace`    : torch + mace-torch, for MACE-MP0 sampling and training.
-
-# Gotchas (learned the hard way)
-- Small/symmetric molecules embed badly from SMILES. Prefer `molecule_name`
-  (ASE g2 names: "H2O", "CO" = carbon monoxide, "CH4", "C6H6") over `smiles`
-  for those. `smiles = "O"` is water, `smiles = "CO"` is METHANOL.
-- Mixtures: every placing builder shares one `species` list. Use `count` (exact)
-  OR `ratio` (apportioned to integers — then set the builder's `n_molecules`
-  total). Never mix count and ratio in one list.
-- Alloys: add a `composition` list (element + ratio in (0,1]) to crystal / slab /
-  surface builders to make a random solid solution.
-- filled_nanotube: wall clearance is sized from van der Waals radii and the tube
-  is fed to Packmol as a fixed obstacle, so guests never overlap the wall. Widen
-  the tube ((n,m)) if it refuses to fill; `tolerance` is the main spacing dial.
-- Fragments: framework atoms (tube/slab/substrate) are tagged tc_fragment = -1;
-  each mobile molecule gets its own id >= 0.
-- Anything needing Packmol/RDKit but run in `default` will fail — use `science`.
-
-# Useful commands
-- `traincraft plugins`              list registered builders/samplers/etc.
-- `traincraft new <path>`           write a starter config
-- `traincraft validate <file>`      check a config and show the resolved stages
-- `pixi run -e <env> traincraft run <file>`   run the pipeline
+# Gotchas
+- Prefer `molecule_name` (ASE g2 = formulae: "H2O", "CH4", "CO"=carbon monoxide)
+  over `smiles` for small molecules; `smiles="O"` is water, `smiles="CO"` is METHANOL.
+- Mixtures: one `species` list per placing builder; use `count` XOR `ratio`.
+- Alloys: a `composition` list (element + ratio) on crystal/slab/surface builders.
+- filled_nanotube wall clearance is auto-sized (vdW + fixed Packmol obstacle).
+- Fragments: framework = tc_fragment -1; each mobile molecule its own id >= 0.
 ```
+
+(The full file also covers the builder/calculator/sampler names, the real output
+paths under `runs/<name>/`, and how to render geometries headlessly.)
 
 ---
 
@@ -245,7 +258,7 @@ write("preview.png", atoms,
 ```
 
 ```bash
-pixi run -e science python render.py runs/tube_waterethanol/geometry/structure.xyz
+pixi run -e science python render.py runs/tube_waterethanol/structures/initial.extxyz
 ```
 
 Then just `scp` `preview.png` to your laptop (or have Pi embed it in its reply).
@@ -278,7 +291,7 @@ In a notebook cell:
 ```python
 from weas_widget import WeasWidget
 from ase.io import read
-WeasWidget(from_ase=read("runs/tube_waterethanol/geometry/structure.xyz"))
+WeasWidget(from_ase=read("runs/tube_waterethanol/structures/initial.extxyz"))
 ```
 
 For MD output, point the reader at the multi-frame `.extxyz` trajectory and the
@@ -298,7 +311,7 @@ open("view.html", "w").write(v._make_html())
 ```
 
 ```bash
-pixi run -e science python to_html.py runs/.../structure.xyz
+pixi run -e science python to_html.py runs/<name>/structures/initial.extxyz
 python -m http.server 8000          # serve the folder
 # laptop:  ssh -L 8000:localhost:8000 you@your-vm  →  open http://localhost:8000/view.html
 ```
