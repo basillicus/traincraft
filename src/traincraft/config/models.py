@@ -656,8 +656,50 @@ class MonteCarloSampling(TCModel):
         return self
 
 
+class ScanAxis(TCModel):
+    """One axis of a scan grid: ``steps`` values evenly spaced over [start, stop].
+
+    For ``translate`` the values are displacements in Å along the axis (added to
+    the fragment's current position); for ``rotate`` they are angles in degrees
+    about the axis through the fragment centroid.
+    """
+
+    axis: Literal["x", "y", "z"] | tuple[float, float, float] = "z"
+    start: float
+    stop: float
+    steps: int = 5
+
+    @model_validator(mode="after")
+    def _check(self) -> ScanAxis:
+        if self.steps < 1:
+            raise ValueError("scan axis needs steps >= 1")
+        return self
+
+
+class ScanSampling(TCModel):
+    """Deterministic grid scan of one fragment's position/orientation.
+
+    Produces the Cartesian product of the ``translate`` and/or ``rotate`` grids
+    (at least one is required) applied to ``fragment`` — e.g. a binding curve
+    (translate along z) or an orientation grid (rotate). Energies are added by
+    the labeling stage, like every other sampler.
+    """
+
+    type: Literal["scan"] = "scan"
+    fragment: int | Literal["all"] = 0  # tc_fragment id to move (adsorbate/guest = 0)
+    translate: ScanAxis | None = None
+    rotate: ScanAxis | None = None
+
+    @model_validator(mode="after")
+    def _need_a_grid(self) -> ScanSampling:
+        if self.translate is None and self.rotate is None:
+            raise ValueError("scan needs at least one of 'translate' or 'rotate'")
+        return self
+
+
 SamplingConfig = Annotated[
-    MdSampling | RattleSampling | MonteCarloSampling, Field(discriminator="type")
+    MdSampling | RattleSampling | MonteCarloSampling | ScanSampling,
+    Field(discriminator="type"),
 ]
 
 

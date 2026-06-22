@@ -418,6 +418,44 @@ Metropolis MC with rigid-body translate/rotate and optional conformer-swap moves
 | `refresh_scale` | `float` | `1.2` | Bond-radius scale for `infer_fragments` |
 | `seed` | `int \| null` | `null` | RNG seed |
 
+### `type = "scan"`
+
+**Deterministic** grid scan of one fragment's position/orientation — the exact,
+combinatorial counterpart to the stochastic samplers above. It enumerates the
+**Cartesian product** of a `translate` and/or `rotate` grid applied to the chosen
+fragment, so it's the tool for potential-energy-surface scans, binding/
+dissociation curves and orientation grids. Energies are attached by the
+[`[labeling]`](#labeling) stage, like every sampler.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `fragment` | `int \| "all"` | `0` | `tc_fragment` id to move (adsorbate/guest = `0`); `"all"` moves the whole system |
+| `translate` | `ScanAxis \| null` | `null` | Grid of displacements (Å) along an axis, added to the fragment's position |
+| `rotate` | `ScanAxis \| null` | `null` | Grid of rotations (degrees) about an axis through the fragment centroid |
+
+At least one of `translate` / `rotate` is required. A **`ScanAxis`** is a small
+table — `steps` values evenly spaced over `[start, stop]` (both ends inclusive):
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `axis` | `"x" \| "y" \| "z"` or `[x, y, z]` | `"z"` | Axis to translate along / rotate about |
+| `start` | `float` | — | First grid value (Å for translate, degrees for rotate) |
+| `stop` | `float` | — | Last grid value |
+| `steps` | `int` | `5` | Number of grid points (so `translate.steps × rotate.steps` candidates) |
+
+```toml
+[sampling]
+type = "scan"
+fragment = 0
+translate = { axis = "z", start = 0.0, stop = 3.0, steps = 13 }   # 13-point binding curve
+rotate    = { axis = "x", start = 0.0, stop = 180.0, steps = 7 }  # × 7 orientations = 91 frames
+```
+
+!!! tip "Keep every grid point"
+    A scan is meant to be exhaustive, so pair it with a generous
+    [`[selection]`](#selection) `budget` (or drop the `diversity` step), or the
+    funnel will thin your grid.
+
 ---
 
 ## `[selection]`

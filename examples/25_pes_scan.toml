@@ -1,0 +1,39 @@
+[run]
+name   = "25_pes_scan"
+outdir = "runs"
+seed   = 1
+# Deterministic potential-energy-surface scan: a CO molecule is lifted off a
+# Cu(111) surface in a regular grid of heights (a binding curve), and each grid
+# point is labeled by the calculator. Unlike md/monte_carlo, `scan` enumerates
+# an EXACT grid — here 13 heights from contact (0.0) to +3.0 Å. The CO is
+# fragment 0 (mobile); the slab is framework (-1) and never moves.
+# Zero extra deps (ASE add_adsorbate + EMT). Run with:
+#   pixi run example-25
+# or:
+#   traincraft run examples/25_pes_scan.toml
+
+[geometry.builder]
+type          = "surface_adsorbate"
+element       = "Cu"
+facet         = "fcc111"
+size          = [3, 3, 4]
+vacuum        = 12.0
+molecule_name = "CO"
+site          = "ontop"
+height        = 2.0          # starting height; the scan lifts CO from here
+
+[calculator]
+type = "emt"
+
+[sampling]
+type     = "scan"
+fragment = 0                 # move the CO adsorbate (slab stays put)
+translate = { axis = "z", start = 0.0, stop = 3.0, steps = 13 }
+
+# A scan is exhaustive by design — keep every grid point (no diversity pruning).
+[selection]
+steps  = ["physicality", "dedup"]
+budget = 13
+
+[dataset]
+path = "dataset"
