@@ -87,8 +87,12 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
 
     # --- FHI-aims: MKL + ScaLAPACK over OpenMPI BLACS ---------------------------
     # AIMS_SRC must be a tarball with exactly ONE top-level dir (--strip-components=1
-    # drops it). Build it that way: `git -C FHIaims archive --prefix=aims/ -o s.tgz HEAD`
-    # — NOT `tar -czf … -C FHIaims .` (flat, no top dir). See docs/how-to/hpc.md.
+    # drops it) AND must include FHI-aims' submodules — ELSI is required to build.
+    # Check them out first, then tar the working tree (NOT `git archive`, which omits
+    # submodules):
+    #   git -C FHIaims submodule update --init --recursive
+    #   tar czf s.tgz -C <parent> FHIaims --exclude-vcs
+    # See docs/how-to/hpc.md.
     mkdir -p /opt/aims && tar -xf /opt/aims-src.tar.gz -C /opt/aims --strip-components=1
     cd /opt/aims && mkdir -p build && cd build
 

@@ -151,18 +151,22 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     which `set -e` turns into a build failure. Re-run with `--force`, tolerate its
     exit code, and **hard-assert** the key var so a missing env fails loudly here,
     not later in `cmake`: `. …/setvars.sh --force || true; : "${MKLROOT:?unset}"`.
-  - From a clone, make a clean archive **named by the source's git hash** (so
-    reusing it when it already exists is safe — changed source → new hash → new
-    file), then build:
+  - Make a clean archive **named by the source git hash** (so reusing it when it
+    already exists is safe — changed source → new hash → new file). FHI-aims has
+    **git submodules** (`external_libraries/elsi_interface` — ELSI — is *required*
+    to build), and `git archive` silently omits them, so init submodules and tar the
+    **working tree** (drop `.git`); do NOT use `git archive` for FHI-aims:
     ```bash
+    git -C ./FHIaims submodule update --init --recursive   # ELSI etc. — REQUIRED
     rev=$(git -C ./FHIaims rev-parse --short HEAD)
     arc=/tmp/fhi-aims-$rev.tar.gz
-    [ -f "$arc" ] || git -C ./FHIaims archive --prefix=aims/ --format=tar.gz -o "$arc" HEAD
+    [ -f "$arc" ] || tar czf "$arc" -C <parent-of-FHIaims> FHIaims --exclude-vcs
     apptainer build --fakeroot --build-arg AIMS_SRC="$arc" \
       traincraft-dft.sif containers/traincraft-dft.def
     ```
-    (Submodules? `git archive` misses them — fall back to
-    `tar czf "$arc" -C <parent-dir> FHIaims`.)
+    (`--exclude-vcs` drops `.git`/`.gitmodules`; the submodule *source* stays. The
+    single top dir `FHIaims/` matches the def's `--strip-components=1`. If ELSI is
+    missing the FHI-aims `cmake` fails — see the build note in the def.)
   - **Never skip on a bare filename/mtime check** (`[ -f /tmp/fhi-aims.tar.gz ]`):
     that silently builds **stale** source if the repo moved on. Key any reuse on the
     git hash (above). The few-second archive isn't worth caching anyway — put real
