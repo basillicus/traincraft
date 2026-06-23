@@ -49,7 +49,8 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
     set -eux
     jobs="{{ BUILD_JOBS }}"; jobs="${jobs:-$(nproc)}"   # parallel build width
     apt-get update && apt-get install -y --no-install-recommends \
-        cmake make git wget ca-certificates \
+        cmake make git wget ca-certificates file pkg-config \
+        libevent-dev libhwloc-dev \
         librdmacm-dev libibverbs-dev libnuma-dev
     rm -rf /var/lib/apt/lists/*
 
@@ -68,22 +69,43 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
     cd /tmp
 
     # --- UCX + PMIx + OpenMPI (built with the Intel compilers, same as QE) -------
+    # Each ./configure / make / make install is on its OWN line: chaining with `&&`
+    # masks failures, because `set -e` is suppressed for a non-final command in an &&
+    # list (a failed ./configure would otherwise sail past unnoticed). PMIx + OpenMPI
+    # use the SYSTEM libevent + hwloc (installed above): OpenMPI refuses an external
+    # PMIx alongside its *internal* libevent/hwloc, so they must all be external.
     wget -q https://github.com/openucx/ucx/releases/download/v{{ UCX_VERSION }}/ucx-{{ UCX_VERSION }}.tar.gz
-    tar xf ucx-{{ UCX_VERSION }}.tar.gz && cd ucx-{{ UCX_VERSION }}
+    tar xf ucx-{{ UCX_VERSION }}.tar.gz
+    cd ucx-{{ UCX_VERSION }}
     ./configure --prefix=/opt/ucx --enable-optimizations --disable-logging --disable-debug
-    make -j"$jobs" && make install
+    make -j"$jobs"
+    make install
     cd /tmp && rm -rf ucx-{{ UCX_VERSION }}*
 
     wget -q https://github.com/openpmix/openpmix/releases/download/v{{ PMIX_VERSION }}/pmix-{{ PMIX_VERSION }}.tar.gz
-    tar xf pmix-{{ PMIX_VERSION }}.tar.gz && cd pmix-{{ PMIX_VERSION }}
-    ./configure --prefix=/opt/pmix && make -j"$jobs" && make install
+    tar xf pmix-{{ PMIX_VERSION }}.tar.gz
+    cd pmix-{{ PMIX_VERSION }}
+    # No --with-libevent=/usr: that pins the lib search to /usr/lib and misses
+    # Ubuntu's multiarch /usr/lib/x86_64-linux-gnu. Let pkg-config auto-detect the
+    # installed libevent/hwloc instead.
+    ./configure --prefix=/opt/pmix
+    make -j"$jobs"
+    make install
     cd /tmp && rm -rf pmix-{{ PMIX_VERSION }}*
 
     wget -q https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-{{ OPENMPI_VERSION }}.tar.gz
-    tar xf openmpi-{{ OPENMPI_VERSION }}.tar.gz && cd openmpi-{{ OPENMPI_VERSION }}
+    tar xf openmpi-{{ OPENMPI_VERSION }}.tar.gz
+    cd openmpi-{{ OPENMPI_VERSION }}
+    # CPU-only DFT worker: no GPU MPI. --without-{cuda,rocm,ze} disables OpenMPI's own
+    # accelerator framework, but its bundled ROMIO ships MPICH's MPL which detects
+    # oneAPI Level Zero *independently* and fails to compile (mpl_gpu_ze.c). Disable
+    # ROMIO outright — FHI-aims needs no MPI-IO, and OpenMPI keeps native ompio anyway.
     CC=icx FC=ifx ./configure --prefix=/opt/openmpi \
-        --with-ucx=/opt/ucx --with-pmix=/opt/pmix --with-slurm
-    make -j"$jobs" && make install
+        --with-ucx=/opt/ucx --with-pmix=/opt/pmix \
+        --with-libevent=external --with-hwloc=external --with-slurm \
+        --without-cuda --without-rocm --without-ze --disable-io-romio
+    make -j"$jobs"
+    make install
     cd /tmp && rm -rf openmpi-{{ OPENMPI_VERSION }}*
     export PATH=/opt/openmpi/bin:$PATH
     export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib:$LD_LIBRARY_PATH
@@ -104,6 +126,7 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
     # Intel-MPI one, since our MPI is OpenMPI. Enable DFPT for polarizability.
     cmake -DCMAKE_Fortran_COMPILER=mpifort \
           -DCMAKE_C_COMPILER=mpicc \
+          -DCMAKE_CXX_COMPILER=mpicxx \
           -DUSE_MPI=ON \
           -DUSE_SCALAPACK=ON \
           -DLIB_PATHS="$MKLROOT/lib/intel64" \
