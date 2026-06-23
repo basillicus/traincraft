@@ -32,8 +32,9 @@ From: ubuntu:22.04
     jobs="{{ BUILD_JOBS }}"; jobs="${jobs:-$(nproc)}"   # parallel build width
     export DEBIAN_FRONTEND=noninteractive
     apt-get update && apt-get install -y --no-install-recommends \
-        build-essential gfortran cmake git wget ca-certificates \
+        build-essential gfortran cmake git wget ca-certificates file pkg-config \
         python3 libfftw3-dev libopenblas-dev libscalapack-openmpi-dev \
+        libevent-dev libhwloc-dev zlib1g-dev \
         librdmacm-dev libibverbs-dev libnuma-dev
     rm -rf /var/lib/apt/lists/*
 
@@ -45,38 +46,57 @@ From: ubuntu:22.04
 
     cd /tmp
 
+    # Each ./configure / make / make install is on its own line: chaining with `&&`
+    # masks failures (set -e is suppressed for a non-final command in an && list).
+    # PMIx + OpenMPI use the system libevent + hwloc (installed above) — OpenMPI
+    # refuses an external PMIx alongside its internal libevent/hwloc.
     # --- UCX: RDMA transport for the interconnect -------------------------------
     wget -q https://github.com/openucx/ucx/releases/download/v{{ UCX_VERSION }}/ucx-{{ UCX_VERSION }}.tar.gz
-    tar xf ucx-{{ UCX_VERSION }}.tar.gz && cd ucx-{{ UCX_VERSION }}
+    tar xf ucx-{{ UCX_VERSION }}.tar.gz
+    cd ucx-{{ UCX_VERSION }}
     ./configure --prefix=/opt/ucx --enable-optimizations --disable-logging \
         --disable-debug --without-go --without-java
-    make -j"$jobs" && make install
+    make -j"$jobs"
+    make install
     cd /tmp && rm -rf ucx-{{ UCX_VERSION }}*
 
     # --- PMIx: process wire-up, matched to Slurm's PMIx server ------------------
     wget -q https://github.com/openpmix/openpmix/releases/download/v{{ PMIX_VERSION }}/pmix-{{ PMIX_VERSION }}.tar.gz
-    tar xf pmix-{{ PMIX_VERSION }}.tar.gz && cd pmix-{{ PMIX_VERSION }}
+    tar xf pmix-{{ PMIX_VERSION }}.tar.gz
+    cd pmix-{{ PMIX_VERSION }}
     ./configure --prefix=/opt/pmix
-    make -j"$jobs" && make install
+    make -j"$jobs"
+    make install
     cd /tmp && rm -rf pmix-{{ PMIX_VERSION }}*
 
     # --- OpenMPI: built against UCX + PMIx, launchable by `srun --mpi=pmix` ------
     wget -q https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-{{ OPENMPI_VERSION }}.tar.gz
-    tar xf openmpi-{{ OPENMPI_VERSION }}.tar.gz && cd openmpi-{{ OPENMPI_VERSION }}
+    tar xf openmpi-{{ OPENMPI_VERSION }}.tar.gz
+    cd openmpi-{{ OPENMPI_VERSION }}
     ./configure --prefix=/opt/openmpi \
         --with-ucx=/opt/ucx \
         --with-pmix=/opt/pmix \
+        --with-libevent=external --with-hwloc=external \
         --with-slurm \
         --enable-mca-no-build=btl-uct
-    make -j"$jobs" && make install
+    make -j"$jobs"
+    make install
     cd /tmp && rm -rf openmpi-{{ OPENMPI_VERSION }}*
     export PATH=/opt/openmpi/bin:$PATH
     export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib
 
     # --- Quantum ESPRESSO: pw.x (+ ph.x for linear response) --------------------
     wget -q https://gitlab.com/QEF/q-e/-/archive/qe-{{ QE_VERSION }}/q-e-qe-{{ QE_VERSION }}.tar.gz
-    tar xf q-e-qe-{{ QE_VERSION }}.tar.gz && cd q-e-qe-{{ QE_VERSION }}
-    ./configure MPIF90=mpif90 --enable-parallel --with-scalapack=yes
+    tar xf q-e-qe-{{ QE_VERSION }}.tar.gz
+    cd q-e-qe-{{ QE_VERSION }}
+    # gfortran >= 10 turns QE 7.3's legacy MPI argument mismatches (e.g. INTEGER vs
+    # REAL(8) buffers to MPI_ALLREDUCE, rank mismatches) into hard ERRORS.
+    # -fallow-argument-mismatch downgrades them to warnings, as upstream QE advises
+    # for modern gfortran. Pass via configure, and ensure it lands in make.inc.
+    ./configure MPIF90=mpif90 --enable-parallel --with-scalapack=yes \
+        FFLAGS="-O3 -fallow-argument-mismatch"
+    grep -q fallow-argument-mismatch make.inc || \
+        sed -i -E 's/^(F90FLAGS[[:space:]]*=.*)/\1 -fallow-argument-mismatch/' make.inc
     make -j"$jobs" pw ph
     make install PREFIX=/opt/qe || (install -d /opt/qe/bin && cp bin/* /opt/qe/bin/)
     cd /tmp && rm -rf q-e-qe-{{ QE_VERSION }}*
@@ -101,3 +121,7 @@ From: ubuntu:22.04
       srun --mpi=pmix apptainer exec --bind "$SCRATCH",<pseudo-dir> traincraft-qe.sif pw.x
     Inputs are written, and outputs parsed, by traincraft-core's `qe` calculator
     (TRAINCRAFT_PW_COMMAND). No license required.
+
+    Point QE at your pseudopotentials at run time (pseudo_dir, or bind a dir in).
+    Verified: an isolated-H SCF converges (-0.8893 Ry, JOB DONE) via
+    `mpirun -np 2 pw.x` inside this image.
