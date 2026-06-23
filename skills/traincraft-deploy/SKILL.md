@@ -116,6 +116,17 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
   if the Phase A subuid/userns probe shows `--fakeroot` actually works there. **Never
   publish the DFT `.sif`** (licensed). The source goes in as a **tarball** build-arg
   (the def untars with `--strip-components=1`, so it needs one top-level dir):
+  - **Pre-flight the base image before any long build.** The def's `From:` line
+    pins a vendor tag (Intel oneAPI here, NVIDIA CUDA for the mlip image) and
+    vendors retire old tags — so check it still resolves and fail in seconds, not
+    mid-build:
+    ```bash
+    ref=$(awk '/^From:/{print $2}' containers/traincraft-dft.def)
+    skopeo inspect "docker://$ref" >/dev/null && echo "base OK: $ref" \
+      || echo "base tag GONE — bump From: to a current tag before building"
+    ```
+    (`docker manifest inspect "$ref"` works if skopeo is absent.) If it's gone,
+    check the vendor's current tags, update the `From:` line, then build.
   - From a clone, make a clean archive, then build:
     ```bash
     git -C ./FHIaims archive --prefix=aims/ --format=tar.gz -o /tmp/fhi-aims.tar.gz HEAD
