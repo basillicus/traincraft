@@ -171,3 +171,8 @@ POST
       srun --mpi=pmix apptainer exec --bind "$SCRATCH" traincraft-dft.sif aims.x
     Inputs (control.in/geometry.in) are prepared, and aims.out parsed, by
     traincraft-core via its dft.py FileIOCalculator (TRAINCRAFT_AIMS_COMMAND).
+
+    REQUIRED at run time: FHI-aims aborts with "stacksize too low" unless the
+    job sets `ulimit -s unlimited` (and ideally `export OMP_STACKSIZE=64M`).
+    Put that in your Slurm pre_commands. Verified: an H2 LDA SCF converges
+    (-30.93 eV) via `mpirun -np 2 aims.x` inside this image.

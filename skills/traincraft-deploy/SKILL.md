@@ -258,9 +258,12 @@ ssh <alias> 'cd <project> && traincraft submit config.toml --dry-run'
 Both must pass. Run them for real (with confirmation), watch via `squeue`, inspect
 outputs.
 
-- **F1 — DFT label, CPU path.** A deliberately tiny label (≈2 atoms, QE, minimal
+- **F1 — DFT label, CPU path.** A deliberately tiny label (≈2 atoms, minimal
   basis, 1 SCF). Proves scheduler + runtime + `srun --mpi=<plugin>` + the DFT
   binary actually fire together.
+  - **FHI-aims requires a large stack** or it aborts at startup with "stacksize
+    too low". The job MUST set `ulimit -s unlimited` (and `export OMP_STACKSIZE=64M`)
+    — add these to the profile's Slurm `pre_commands`. (QE does not need this.)
 - **F2 — MACE train+validate, GPU path.** On the GPU partition with `--nv`, run a
   short `train` of a tiny MACE on the smoke data (a handful of epochs), then
   validate: load the model and run a one-point inference / few-step MD and check
