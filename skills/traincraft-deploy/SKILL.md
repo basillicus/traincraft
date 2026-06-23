@@ -160,7 +160,7 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     git -C ./FHIaims submodule update --init --recursive   # ELSI etc. — REQUIRED
     rev=$(git -C ./FHIaims rev-parse --short HEAD)
     arc=/tmp/fhi-aims-$rev.tar.gz
-    [ -f "$arc" ] || tar czf "$arc" -C <parent-of-FHIaims> FHIaims --exclude-vcs
+    [ -f "$arc" ] || tar --exclude-vcs -czf "$arc" -C <parent-of-FHIaims> FHIaims
     apptainer build --fakeroot --build-arg AIMS_SRC="$arc" \
       traincraft-dft.sif containers/traincraft-dft.def
     ```

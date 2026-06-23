@@ -54,10 +54,13 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
     rm -rf /var/lib/apt/lists/*
 
     # The base image already marks setvars as run (SETVARS_COMPLETED), so a plain
-    # source prints usage and exits 3 (which set -e would treat as a failure). Re-run
-    # with --force, tolerate its odd exit code, then hard-assert the env actually got
-    # set — so a missing MKLROOT fails HERE, not cryptically later in cmake.
+    # source prints usage and exits 3 (set -e would treat that as failure) — re-run
+    # with --force. setvars.sh also reads unset vars (e.g. OCL_ICD_FILENAMES), which
+    # trips `set -u`, so source it with nounset OFF. Then hard-assert the env got set
+    # — so a missing MKLROOT fails HERE, not cryptically later in cmake.
+    set +u
     . /opt/intel/oneapi/setvars.sh --force || true   # MKL + icx/ifx (bash-only)
+    set -u
     : "${MKLROOT:?setvars.sh did not set MKLROOT — check the oneAPI base image}"
 
     # TODO(site): add the target arch (e.g. -xSAPPHIRERAPIDS for Leonardo DCGP) to
