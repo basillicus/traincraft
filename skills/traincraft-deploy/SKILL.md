@@ -137,12 +137,13 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     If a vendor env script genuinely needs bash (it throws `Bad substitution` /
     `Unexpected token` under dash), do **not** just add `#!/bin/bash` — Apptainer
     runs the section as `sh /.post.script`, so a shebang is read as a comment and
-    ignored. Run the dependent block in a bash heredoc instead, so the sourced env
-    persists into the build:
+    ignored. Run the source line **and every later step that needs its env** in one
+    bash heredoc (the vendor script exports vars like `MKLROOT`/compiler PATH that
+    the whole build depends on, so a one-line subshell source wouldn't persist):
     ```bash
     bash <<'BUILD'
     . /opt/intel/oneapi/setvars.sh
-    cmake … && make -j"$jobs" …
+    … configure / cmake / make -j"$jobs" … (the whole build)
     BUILD
     ```
   - From a clone, make a clean archive, then build:
