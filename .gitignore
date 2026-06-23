@@ -59,6 +59,10 @@ NOTEs
 # TrainCraft run outputs
 runs/
 
+# Apptainer/Singularity images — multi-GB build artifacts; the DFT image is
+# LICENSED (FHI-aims) and must never be committed or published.
+*.sif
+
 # Pixi
 .pixi/
 

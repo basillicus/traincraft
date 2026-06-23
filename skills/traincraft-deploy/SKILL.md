@@ -127,6 +127,13 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     ```
     (`docker manifest inspect "$ref"` works if skopeo is absent.) If it's gone,
     check the vendor's current tags, update the `From:` line, then build.
+  - **Scan `%post` for the `source` bash-ism.** Apptainer runs `%post` under
+    `/bin/sh` (dash on Ubuntu), where `source file` fails with `source: not found`.
+    Switch real command lines to the POSIX dot (`. file`) — but only commands,
+    never the word "source" in comments/prose:
+    ```bash
+    grep -nE '^[[:space:]]*source[[:space:]]' containers/*.def   # leading 'source' = a command to fix
+    ```
   - From a clone, make a clean archive, then build:
     ```bash
     git -C ./FHIaims archive --prefix=aims/ --format=tar.gz -o /tmp/fhi-aims.tar.gz HEAD
