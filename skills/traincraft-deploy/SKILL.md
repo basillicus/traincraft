@@ -146,14 +146,23 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     … configure / cmake / make -j"$jobs" … (the whole build)
     BUILD
     ```
-  - From a clone, make a clean archive, then build:
+  - From a clone, make a clean archive **named by the source's git hash** (so
+    reusing it when it already exists is safe — changed source → new hash → new
+    file), then build:
     ```bash
-    git -C ./FHIaims archive --prefix=aims/ --format=tar.gz -o /tmp/fhi-aims.tar.gz HEAD
-    apptainer build --fakeroot --build-arg AIMS_SRC=/tmp/fhi-aims.tar.gz \
+    rev=$(git -C ./FHIaims rev-parse --short HEAD)
+    arc=/tmp/fhi-aims-$rev.tar.gz
+    [ -f "$arc" ] || git -C ./FHIaims archive --prefix=aims/ --format=tar.gz -o "$arc" HEAD
+    apptainer build --fakeroot --build-arg AIMS_SRC="$arc" \
       traincraft-dft.sif containers/traincraft-dft.def
     ```
     (Submodules? `git archive` misses them — fall back to
-    `tar czf /tmp/fhi-aims.tar.gz -C <parent-dir> FHIaims`.)
+    `tar czf "$arc" -C <parent-dir> FHIaims`.)
+  - **Never skip on a bare filename/mtime check** (`[ -f /tmp/fhi-aims.tar.gz ]`):
+    that silently builds **stale** source if the repo moved on. Key any reuse on the
+    git hash (above). The few-second archive isn't worth caching anyway — put real
+    caching on the *expensive* step, the image build, by recording the source git
+    hash + def hash in the `.deploy.json` stamp and rebuilding only when either changes.
   - From an existing tarball: `--build-arg AIMS_SRC=/path/to/fhi-aims.tar.gz`.
   - The def **builds and runs with portable defaults — do not "tune" it to get a
     working image, and never auto-edit it from probe data:**
