@@ -53,7 +53,12 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
         librdmacm-dev libibverbs-dev libnuma-dev
     rm -rf /var/lib/apt/lists/*
 
-    . /opt/intel/oneapi/setvars.sh   # MKL + icx/ifx (bash-only — hence the bash block)
+    # The base image already marks setvars as run (SETVARS_COMPLETED), so a plain
+    # source prints usage and exits 3 (which set -e would treat as a failure). Re-run
+    # with --force, tolerate its odd exit code, then hard-assert the env actually got
+    # set — so a missing MKLROOT fails HERE, not cryptically later in cmake.
+    . /opt/intel/oneapi/setvars.sh --force || true   # MKL + icx/ifx (bash-only)
+    : "${MKLROOT:?setvars.sh did not set MKLROOT — check the oneAPI base image}"
 
     # TODO(site): add the target arch (e.g. -xSAPPHIRERAPIDS for Leonardo DCGP) to
     # the FHI-aims flags below; tuning for the CPU is the reason we compile.

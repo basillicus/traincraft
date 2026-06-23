@@ -142,10 +142,15 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     the whole build depends on, so a one-line subshell source wouldn't persist):
     ```bash
     bash <<'BUILD'
-    . /opt/intel/oneapi/setvars.sh
+    . /opt/intel/oneapi/setvars.sh --force   # see note below
     … configure / cmake / make -j"$jobs" … (the whole build)
     BUILD
     ```
+    Also: a vendor base image often **already ran** its env script, so re-sourcing
+    it warns and exits non-zero (Intel `setvars.sh` exits 3, "already been run"),
+    which `set -e` turns into a build failure. Re-run with `--force`, tolerate its
+    exit code, and **hard-assert** the key var so a missing env fails loudly here,
+    not later in `cmake`: `. …/setvars.sh --force || true; : "${MKLROOT:?unset}"`.
   - From a clone, make a clean archive **named by the source's git hash** (so
     reusing it when it already exists is safe — changed source → new hash → new
     file), then build:
