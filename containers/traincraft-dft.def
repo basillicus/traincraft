@@ -119,6 +119,12 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
     #   tar czf s.tgz -C <parent> FHIaims --exclude-vcs
     # See docs/how-to/hpc.md.
     mkdir -p /opt/aims && tar -xf /opt/aims-src.tar.gz -C /opt/aims --strip-components=1
+    # FHI-aims' cmake runs `git submodule update` only if a top-level .git exists,
+    # and that git call fails under the build's fakeroot (dubious ownership). We ship
+    # the submodule SOURCE in the tarball, so drop any .git and let cmake use it
+    # directly (this is how FHI-aims release tarballs build). Defensive: works even
+    # if the tarball was made without --exclude-vcs.
+    rm -rf /opt/aims/.git
     cd /opt/aims && mkdir -p build && cd build
 
     # TODO(site): confirm the MKL ScaLAPACK/BLACS link line for your MKL version.
