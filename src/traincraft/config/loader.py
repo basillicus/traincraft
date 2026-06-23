@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import tomlkit
 
 from .models import TrainCraftConfig
+
+# Where saved cluster profiles live. Overridable (tests, shared sites) via
+# ``TRAINCRAFT_CLUSTERS_DIR``.
+_DEFAULT_CLUSTERS_DIR = "~/.traincraft/clusters"
 
 
 def load_config(path: str | Path) -> TrainCraftConfig:
@@ -31,7 +36,52 @@ def loads_config(text: str) -> TrainCraftConfig:
     doc = tomlkit.parse(text)
     # Unwrap tomlkit's typed containers into plain Python for pydantic.
     plain = json.loads(json.dumps(doc))
+    plain = _resolve_slurm_profile(plain)
     return TrainCraftConfig.model_validate(plain)
+
+
+def _clusters_dir() -> Path:
+    raw = os.environ.get("TRAINCRAFT_CLUSTERS_DIR", _DEFAULT_CLUSTERS_DIR)
+    return Path(os.path.expandvars(os.path.expanduser(raw)))
+
+
+def _load_profile(name: str) -> dict:
+    """Read a saved cluster profile (a serialized ``[orchestration.slurm]`` block)."""
+    path = _clusters_dir() / f"{name}.toml"
+    if not path.is_file():
+        available = sorted(p.stem for p in _clusters_dir().glob("*.toml"))
+        hint = ", ".join(available) if available else "none found"
+        raise FileNotFoundError(
+            f"cluster profile {name!r} not found at {path} "
+            f"(available in {_clusters_dir()}: {hint})"
+        )
+    return json.loads(json.dumps(tomlkit.parse(path.read_text())))
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge *override* onto *base*; override wins for scalars/lists."""
+    out = dict(base)
+    for key, val in override.items():
+        if isinstance(val, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], val)
+        else:
+            out[key] = val
+    return out
+
+
+def _resolve_slurm_profile(plain: dict) -> dict:
+    """Expand ``[orchestration.slurm] profile = "<name>"`` against the registry.
+
+    The named profile is the base; the inline ``[orchestration.slurm]`` keys are
+    layered on top (inline wins), so one workflow targets a different cluster by
+    changing only the profile name. No-op when no profile is referenced.
+    """
+    slurm = plain.get("orchestration", {}).get("slurm")
+    if not isinstance(slurm, dict) or not slurm.get("profile"):
+        return plain
+    merged = _deep_merge(_load_profile(slurm["profile"]), slurm)
+    plain["orchestration"]["slurm"] = merged
+    return plain
 
 
 def _resolve_input_paths(cfg: TrainCraftConfig, base: Path) -> TrainCraftConfig:

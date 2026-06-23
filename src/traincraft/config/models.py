@@ -871,6 +871,11 @@ class SlurmStage(TCModel):
 
 
 class SlurmConfig(TCModel):
+    # Name of a saved cluster profile (``~/.traincraft/clusters/<name>.toml``).
+    # When set, that profile is loaded as the base and these inline keys override
+    # it, so a workflow moves between clusters by changing this one line. Resolved
+    # by the loader before validation; recorded here for provenance.
+    profile: str | None = None
     account: str | None = None
     sif_dir: FsPath = "."  # directory holding the .sif images
     modules: list[str] = Field(default_factory=list)  # `module load` names

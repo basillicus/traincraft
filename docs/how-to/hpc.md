@@ -93,6 +93,47 @@ traincraft submit config.toml --dry-run   # render + inspect the sbatch scripts
 traincraft submit config.toml             # sbatch, dependency-chained
 ```
 
+## Cluster profiles — switch HPC by changing one line
+
+The `[orchestration.slurm]` block above is **per cluster**, not per workflow.
+Rather than copy it into every config, save it once as a named **profile** and
+reference it. Profiles live in `~/.traincraft/clusters/<name>.toml` (override the
+directory with `TRAINCRAFT_CLUSTERS_DIR`) and contain exactly the keys that would
+go under `[orchestration.slurm]`:
+
+```toml
+# ~/.traincraft/clusters/leonardo.toml
+account = "EUHPC_xxxxxxx"
+runtime = "apptainer"
+mpi     = "pmix"
+sif_dir = "$WORK/sif"
+modules = ["apptainer"]
+binds   = ["$SCRATCH", "$WORK"]
+
+[stages.sample]
+partition = "boost_usr_prod"
+gpus = 1
+
+[stages.label]
+partition = "dcgp_usr_prod"
+nodes = 2
+ntasks = 224
+```
+
+A workflow then targets that cluster with one line:
+
+```toml
+[orchestration]
+engine = "slurm"
+
+[orchestration.slurm]
+profile = "leonardo"     # ← change to "lumi" to run the same workflow elsewhere
+```
+
+Any inline `[orchestration.slurm]` keys you add **override** the profile (handy
+for testing — e.g. drop `ntasks` while debugging), and inline per-stage tables
+deep-merge onto the profile's. The profile is the base; inline wins.
+
 ## Two knobs that make it portable: `runtime` and `mpi`
 
 There is **no universal MPI setup** — the cluster decides. TrainCraft exposes this
