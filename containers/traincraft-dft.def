@@ -32,12 +32,16 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
     UCX_VERSION=1.17.0
     PMIX_VERSION=5.0.3
     OPENMPI_VERSION=5.0.5
+    # Parallel build width. Defaults to nproc; override (--build-arg BUILD_JOBS=N)
+    # on shared build nodes where nproc under-reports the cgroup CPU quota.
+    BUILD_JOBS=
 
 %files
     {{ AIMS_SRC }} /opt/aims-src.tar.gz
 
 %post
     set -eux
+    jobs="{{ BUILD_JOBS }}"; jobs="${jobs:-$(nproc)}"   # parallel build width
     apt-get update && apt-get install -y --no-install-recommends \
         cmake make git wget ca-certificates \
         librdmacm-dev libibverbs-dev libnuma-dev
@@ -53,24 +57,27 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
     wget -q https://github.com/openucx/ucx/releases/download/v{{ UCX_VERSION }}/ucx-{{ UCX_VERSION }}.tar.gz
     tar xf ucx-{{ UCX_VERSION }}.tar.gz && cd ucx-{{ UCX_VERSION }}
     ./configure --prefix=/opt/ucx --enable-optimizations --disable-logging --disable-debug
-    make -j"$(nproc)" && make install
+    make -j"$jobs" && make install
     cd /tmp && rm -rf ucx-{{ UCX_VERSION }}*
 
     wget -q https://github.com/openpmix/openpmix/releases/download/v{{ PMIX_VERSION }}/pmix-{{ PMIX_VERSION }}.tar.gz
     tar xf pmix-{{ PMIX_VERSION }}.tar.gz && cd pmix-{{ PMIX_VERSION }}
-    ./configure --prefix=/opt/pmix && make -j"$(nproc)" && make install
+    ./configure --prefix=/opt/pmix && make -j"$jobs" && make install
     cd /tmp && rm -rf pmix-{{ PMIX_VERSION }}*
 
     wget -q https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-{{ OPENMPI_VERSION }}.tar.gz
     tar xf openmpi-{{ OPENMPI_VERSION }}.tar.gz && cd openmpi-{{ OPENMPI_VERSION }}
     CC=icx FC=ifx ./configure --prefix=/opt/openmpi \
         --with-ucx=/opt/ucx --with-pmix=/opt/pmix --with-slurm
-    make -j"$(nproc)" && make install
+    make -j"$jobs" && make install
     cd /tmp && rm -rf openmpi-{{ OPENMPI_VERSION }}*
     export PATH=/opt/openmpi/bin:$PATH
     export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib:$LD_LIBRARY_PATH
 
     # --- FHI-aims: MKL + ScaLAPACK over OpenMPI BLACS ---------------------------
+    # AIMS_SRC must be a tarball with exactly ONE top-level dir (--strip-components=1
+    # drops it). Build it that way: `git -C FHIaims archive --prefix=aims/ -o s.tgz HEAD`
+    # — NOT `tar -czf … -C FHIaims .` (flat, no top dir). See docs/how-to/hpc.md.
     mkdir -p /opt/aims && tar -xf /opt/aims-src.tar.gz -C /opt/aims --strip-components=1
     cd /opt/aims && mkdir -p build && cd build
 
@@ -85,7 +92,7 @@ From: intel/oneapi-hpckit:2025.2.0-0-devel-ubuntu22.04
           -DLIBS="mkl_scalapack_lp64 mkl_intel_lp64 mkl_sequential mkl_core mkl_blacs_openmpi_lp64" \
           -DCMAKE_BUILD_TYPE=Release \
           ..
-    make -j"$(nproc)" aims.x
+    make -j"$jobs" aims.x
 
     install -d /opt/aims/bin
     cp /opt/aims/build/aims.x /opt/aims/bin/aims.x

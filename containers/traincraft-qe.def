@@ -23,9 +23,13 @@ From: ubuntu:22.04
     PMIX_VERSION=5.0.3
     OPENMPI_VERSION=5.0.5
     QE_VERSION=7.3.1
+    # Parallel build width. Defaults to nproc; override (--build-arg BUILD_JOBS=N)
+    # on shared build nodes where nproc under-reports the cgroup CPU quota.
+    BUILD_JOBS=
 
 %post
     set -eux
+    jobs="{{ BUILD_JOBS }}"; jobs="${jobs:-$(nproc)}"   # parallel build width
     export DEBIAN_FRONTEND=noninteractive
     apt-get update && apt-get install -y --no-install-recommends \
         build-essential gfortran cmake git wget ca-certificates \
@@ -46,14 +50,14 @@ From: ubuntu:22.04
     tar xf ucx-{{ UCX_VERSION }}.tar.gz && cd ucx-{{ UCX_VERSION }}
     ./configure --prefix=/opt/ucx --enable-optimizations --disable-logging \
         --disable-debug --without-go --without-java
-    make -j"$(nproc)" && make install
+    make -j"$jobs" && make install
     cd /tmp && rm -rf ucx-{{ UCX_VERSION }}*
 
     # --- PMIx: process wire-up, matched to Slurm's PMIx server ------------------
     wget -q https://github.com/openpmix/openpmix/releases/download/v{{ PMIX_VERSION }}/pmix-{{ PMIX_VERSION }}.tar.gz
     tar xf pmix-{{ PMIX_VERSION }}.tar.gz && cd pmix-{{ PMIX_VERSION }}
     ./configure --prefix=/opt/pmix
-    make -j"$(nproc)" && make install
+    make -j"$jobs" && make install
     cd /tmp && rm -rf pmix-{{ PMIX_VERSION }}*
 
     # --- OpenMPI: built against UCX + PMIx, launchable by `srun --mpi=pmix` ------
@@ -64,7 +68,7 @@ From: ubuntu:22.04
         --with-pmix=/opt/pmix \
         --with-slurm \
         --enable-mca-no-build=btl-uct
-    make -j"$(nproc)" && make install
+    make -j"$jobs" && make install
     cd /tmp && rm -rf openmpi-{{ OPENMPI_VERSION }}*
     export PATH=/opt/openmpi/bin:$PATH
     export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib
@@ -73,7 +77,7 @@ From: ubuntu:22.04
     wget -q https://gitlab.com/QEF/q-e/-/archive/qe-{{ QE_VERSION }}/q-e-qe-{{ QE_VERSION }}.tar.gz
     tar xf q-e-qe-{{ QE_VERSION }}.tar.gz && cd q-e-qe-{{ QE_VERSION }}
     ./configure MPIF90=mpif90 --enable-parallel --with-scalapack=yes
-    make -j"$(nproc)" pw ph
+    make -j"$jobs" pw ph
     make install PREFIX=/opt/qe || (install -d /opt/qe/bin && cp bin/* /opt/qe/bin/)
     cd /tmp && rm -rf q-e-qe-{{ QE_VERSION }}*
 

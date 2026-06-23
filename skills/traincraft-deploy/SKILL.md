@@ -134,6 +134,17 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     ```bash
     grep -nE '^[[:space:]]*source[[:space:]]' containers/*.def   # leading 'source' = a command to fix
     ```
+    If a vendor env script genuinely needs bash (it throws `Bad substitution` /
+    `Unexpected token` under dash), do **not** just add `#!/bin/bash` — Apptainer
+    runs the section as `sh /.post.script`, so a shebang is read as a comment and
+    ignored. Run the dependent block in a bash heredoc instead, so the sourced env
+    persists into the build:
+    ```bash
+    bash <<'BUILD'
+    . /opt/intel/oneapi/setvars.sh
+    cmake … && make -j"$jobs" …
+    BUILD
+    ```
   - From a clone, make a clean archive, then build:
     ```bash
     git -C ./FHIaims archive --prefix=aims/ --format=tar.gz -o /tmp/fhi-aims.tar.gz HEAD
@@ -143,11 +154,18 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     (Submodules? `git archive` misses them — fall back to
     `tar czf /tmp/fhi-aims.tar.gz -C <parent-dir> FHIaims`.)
   - From an existing tarball: `--build-arg AIMS_SRC=/path/to/fhi-aims.tar.gz`.
-  - The def **builds and runs with portable defaults — you do not need to edit it**
-    to get a working image. The `TODO(site)` markers (target-arch flag, MKL link
-    line) are **optional performance tuning only**; skip them unless the user
-    explicitly asks to optimize, and even then only *propose* values to confirm —
-    never silently edit or guess the arch.
+  - The def **builds and runs with portable defaults — do not "tune" it to get a
+    working image, and never auto-edit it from probe data:**
+    - **Arch flags** (`-x…` / `-march=…`) are opt-in **per-cluster** and must match
+      the **compute** node, not the build node — you usually build on a laptop/login
+      node with a *different* CPU, and a mismatched flag yields a binary that
+      **SIGILLs** on the target. Add one only if the user asks *and* you know the
+      run-node CPU; otherwise leave the `TODO(site)` blank (generic = runs anywhere).
+    - **`mkl_sequential` is deliberate, not a bug.** FHI-aims runs pure-MPI (one
+      rank/core), so threaded MKL (`mkl_intel_thread`) would oversubscribe and slow
+      it down. Leave it unless the user is doing hybrid MPI+OpenMP with explicit pinning.
+  - **Build parallelism:** both DFT/QE defs accept `--build-arg BUILD_JOBS=N`
+    (default `nproc`); pass it on shared build nodes where `nproc` under-reports.
 - **Compile on the HPC (native):** QE from source; FHI-aims (the same clone) built
   against the site MPI, then point `runtime = "native"` at the resulting binary.
 
