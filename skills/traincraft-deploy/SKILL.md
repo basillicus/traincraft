@@ -117,12 +117,22 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
   publish the DFT `.sif`** (licensed). The source goes in as a **tarball** build-arg
   (the def untars with `--strip-components=1`, so it needs one top-level dir):
   - **Two FHI-aims variants — default to the slim one.** `traincraft-dft.def` is the
-    small (~550 MB) image: gfortran + OpenBLAS + source-built ScaLAPACK — a fully open
-    toolchain, no Intel. `traincraft-dft-mkl.def` is the large (~4 GB) oneAPI/MKL build
-    for maximum Intel-CPU throughput. **Build the slim one unless the user asks for MKL
-    performance**; the two give identical physics (verified: H₂ LDA −30.93 eV from
-    both). The MKL-specific notes below (`setvars.sh`, `mkl_sequential`) apply *only* to
-    the `-mkl` def. The slim def mirrors the QE recipe and builds the same way.
+    small image: gfortran + OpenBLAS + source-built ScaLAPACK — a fully open toolchain,
+    no Intel. `traincraft-dft-mkl.def` is the large oneAPI/MKL build for maximum
+    Intel-CPU throughput. **Identical physics** (energies match to all printed digits);
+    the choice is purely size-vs-speed:
+
+    | variant | toolchain | image | speed (benzene tight/PBE, np=4, 1 thr/rank, Core Ultra 7) |
+    |---|---|---|---|
+    | `traincraft-dft.def` (default) | gfortran + OpenBLAS | ~550 MB | 106 s |
+    | `traincraft-dft-mkl.def` | oneAPI / MKL | ~4.1 GB | 78 s (~1.36× faster) |
+
+    **Default to slim** (≈8× smaller → trivial to `rsync`, cache, store) unless DFT
+    *labeling throughput on Intel CPUs* is the bottleneck — then MKL buys ~25–35% here.
+    That gap is workload/CPU-dependent: it narrows for ELPA-dominated large periodic
+    systems and on AMD. The MKL-specific notes below (`setvars.sh`, `mkl_sequential`)
+    apply *only* to the `-mkl` def; the slim def mirrors the QE recipe and builds the
+    same way.
   - **A non-oneAPI base needs `python3`, and all defs retry downloads.** The slim DFT
     and QE defs build on `ubuntu:22.04`, where PMIx's `./configure` aborts with "no
     suitable Python interpreter found" unless `python3` is in the apt list (the oneAPI
