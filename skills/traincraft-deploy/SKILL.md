@@ -116,6 +116,19 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
   if the Phase A subuid/userns probe shows `--fakeroot` actually works there. **Never
   publish the DFT `.sif`** (licensed). The source goes in as a **tarball** build-arg
   (the def untars with `--strip-components=1`, so it needs one top-level dir):
+  - **Two FHI-aims variants — default to the slim one.** `traincraft-dft.def` is the
+    small (~550 MB) image: gfortran + OpenBLAS + source-built ScaLAPACK — a fully open
+    toolchain, no Intel. `traincraft-dft-mkl.def` is the large (~4 GB) oneAPI/MKL build
+    for maximum Intel-CPU throughput. **Build the slim one unless the user asks for MKL
+    performance**; the two give identical physics (verified: H₂ LDA −30.93 eV from
+    both). The MKL-specific notes below (`setvars.sh`, `mkl_sequential`) apply *only* to
+    the `-mkl` def. The slim def mirrors the QE recipe and builds the same way.
+  - **A non-oneAPI base needs `python3`, and all defs retry downloads.** The slim DFT
+    and QE defs build on `ubuntu:22.04`, where PMIx's `./configure` aborts with "no
+    suitable Python interpreter found" unless `python3` is in the apt list (the oneAPI
+    base ships one, so the `-mkl` def doesn't need it). Every def writes an `/etc/wgetrc`
+    (`tries=5`, `waitretry=15`, `retry_connrefused=on`) so a transient network blip on a
+    flaky build node retries instead of throwing away a 30-minute build.
   - **Pre-flight the base image before any long build.** The def's `From:` line
     pins a vendor tag (Intel oneAPI here, NVIDIA CUDA for the mlip image) and
     vendors retire old tags — so check it still resolves and fail in seconds, not

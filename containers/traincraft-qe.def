@@ -38,6 +38,10 @@ From: ubuntu:22.04
         librdmacm-dev libibverbs-dev libnuma-dev
     rm -rf /var/lib/apt/lists/*
 
+    # Harden every download below against transient network blips (a single failed
+    # wget should not throw away a long build — HPC build nodes are flaky).
+    printf 'tries=5\nwaitretry=15\ntimeout=30\nretry_connrefused=on\n' > /etc/wgetrc
+
     # TODO(site): add -march=native (or the cluster's arch, e.g. -march=sapphirerapids
     # / -march=znver3) to CFLAGS/FFLAGS below once you know the target CPU. The whole
     # point of compiling from source is this tuning; conda-forge's generic build is
