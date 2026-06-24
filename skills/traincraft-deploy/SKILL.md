@@ -133,6 +133,18 @@ Slurm, e.g. Leonardo) → `cray_shasta` (Cray/Slingshot, e.g. LUMI — no pmix) 
     systems and on AMD. The MKL-specific notes below (`setvars.sh`, `mkl_sequential`)
     apply *only* to the `-mkl` def; the slim def mirrors the QE recipe and builds the
     same way.
+  - **MKL on AMD (EPYC/Zen) — prefer slim there.** The `-mkl` image *runs* on AMD: it
+    is generic x86-64 (we add no `-x…`/`-march` Intel arch flags, so no SIGILL). But
+    MKL's runtime dispatcher historically detects non-`GenuineIntel` CPUs and drops to
+    slow SSE/generic kernels instead of AVX2/AVX-512, so its Intel speed lead can shrink,
+    vanish, or invert on AMD. If you must run `-mkl` on AMD, force good kernels with
+    `export MKL_ENABLE_INSTRUCTIONS=AVX2` (safe on all modern Zen; use `AVX512` only on
+    Zen4/Zen5 — Rome/Milan lack AVX-512). The old `MKL_DEBUG_CPU_TYPE=5` workaround is
+    **gone** (removed in MKL 2020+; this image is on 2025.x). **On AMD partitions the
+    slim/OpenBLAS image is usually the better default** — OpenBLAS dispatches native Zen
+    kernels with no env-var games, so you typically get MKL-class speed *and* the ~8×
+    smaller image. (TODO: confirm with a benzene/tight A/B on an AMD HPC — numbers above
+    are Intel-only.)
   - **A non-oneAPI base needs `python3`, and all defs retry downloads.** The slim DFT
     and QE defs build on `ubuntu:22.04`, where PMIx's `./configure` aborts with "no
     suitable Python interpreter found" unless `python3` is in the apt list (the oneAPI
